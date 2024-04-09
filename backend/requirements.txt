@@ -1,0 +1,9 @@
+fake-useragent
+selenium
+loguru
+fastapi
+uvicorn
+httpx
+python-multipart
+pyjwt
+aiosmtpd
