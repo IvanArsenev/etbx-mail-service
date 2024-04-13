@@ -187,6 +187,7 @@ async def read_users_id(id: str, current_user: dict = Depends(get_current_user))
         except:
             avatar = False
         user = {
+            "id": data[0],
             "Имя": data[1],
             "Фамилия": data[2],
             "Дата рождения": convert_data(data[3]),
