@@ -7,3 +7,5 @@ httpx
 python-multipart
 pyjwt
 aiosmtpd
+passlib
+bcrypt
