@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from pydantic import BaseModel, Field, ValidationError
-from typing import Optional
+from typing import Optional, List
 import re
 
 from config import *
@@ -19,6 +19,7 @@ class User(Base):
     phone_num = Column(String(15))
     password = Column(String(250))
     token = Column(String(250))
+    avatar = Column(String(5))
 
 class DisabledTokens(Base):
     __tablename__ = "disabledTokens"
@@ -37,6 +38,20 @@ class RegistrationRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+class UsersResponse(BaseModel):
+    id: int
+    Имя: str
+    Фамилия: str
+    Дата_рождения: str
+    Пол: str
+    Логин: str
+    Номер_телефона: Optional[str]
+    Аватар: str
+
+class PaginatedUsersResponse(BaseModel):
+    total_users: int
+    users: List[UsersResponse]
 
 # Создание таблиц
 Base.metadata.create_all(bind=create_engine(DATABASE_URL))
