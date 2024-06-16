@@ -19,7 +19,7 @@ class User(Base):
     phone_num = Column(String(15))
     password = Column(String(250))
     token = Column(String(250))
-    avatar = Column(String(5))
+    avatar = Column(String(50))
 
 class DisabledTokens(Base):
     __tablename__ = "disabledTokens"

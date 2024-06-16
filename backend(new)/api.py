@@ -1,9 +1,12 @@
 import uvicorn, jwt
-from fastapi import Depends, status, FastAPI, HTTPException, Query
+from fastapi import Depends, status, FastAPI, HTTPException, Query, File, UploadFile
+from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import re
+from pathlib import Path
+from PIL import Image
 import requests
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
@@ -13,17 +16,21 @@ from classes import *
 from passlib.context import CryptContext
 from datetime import datetime
 
-# Инициализация приложения и базы данных
+
 app = FastAPI()
 
+app.mount("/avatars", StaticFiles(directory="avatars"), name="avatars")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# Создание движка и сессии для работы с базой данных
+
+
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+
 
 def get_password_hash(password):
     return pwd_context.hash(password)
@@ -36,7 +43,6 @@ def create_access_token(data: dict):
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
-# Функция для получения текущего пользователя по токену
 def get_current_user(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -55,9 +61,10 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
     return user
 
-# Функция для получения пользователя по email
 def get_user_by_email(email):
     return SessionLocal().query(User).filter(User.mail == email).first()
+
+
 
 @app.get("/users/me")
 async def read_users_me(current_user: User = Depends(get_current_user)):
@@ -70,6 +77,7 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
         "Дата рождения": formatted_date_str,
         "Пол": current_user.gender,
         "Логин": current_user.mail,
+        "Номер_телефона": current_user.phone_num if current_user.phone_num else "Отсутствует",
         "Аватар": current_user.avatar,
         "token": current_user.token
     }
@@ -154,7 +162,61 @@ async def login_for_access_token(form_data: LoginRequest):
         )
     return {"Token": user.token}
 
+@app.get("/avatars/{image_name}")
+def get_image(image_name: str):
+    return {"message": f"Requesting image: {image_name}"}
 
+@app.put("/edit_avatar")
+async def edit_avatar(avatar: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    if not avatar.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="Неверный формат файла!")
+    MAX_SIZE = 10 * 1024 * 1024
+    await avatar.seek(0)
+    file_content = await avatar.read()
+    if len(file_content) > MAX_SIZE:
+        raise HTTPException(status_code=413, detail="Размер файла слишком большой (не более 10 Мб)!")
+    avatar.file.seek(0)
+    try:
+        with Image.open(avatar.file) as img:
+            width, height = img.size
+            if height > width and height > 512:
+                new_height = 512
+                new_width = int((new_height / height) * width)
+                img = img.resize((new_width, new_height), Image.LANCZOS)
+            elif width > height and width > 512:
+                new_width = 512
+                new_height = int((new_width / width) * height)
+                img = img.resize((new_width, new_height), Image.LANCZOS)
+            elif width == height and width > 512:
+                new_width = 512
+                new_height = 512
+                img = img.resize((new_width, new_height), Image.LANCZOS)
+            save_path = Path(f"./avatars/{current_user.id}.png")
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            img.save(save_path, format="PNG")
+        db = SessionLocal()
+        db_user = db.query(User).filter(User.id == current_user.id).first()
+        db_user.avatar = f"avatars/{current_user.id}.png"
+        db.commit()
+        return {"message": "Аватар успешно обновлен"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при обработке файла: {str(e)}")
+
+@app.delete("/remove_avatar")
+async def remove_avatar(current_user: dict = Depends(get_current_user)):
+    try:
+        avatar_path = Path(f"./avatars/{current_user.id}.png")
+        if avatar_path.exists():
+            avatar_path.unlink()
+            db = SessionLocal()
+            db_user = db.query(User).filter(User.id == current_user.id).first()
+            db_user.avatar = None
+            db.commit()
+            return {"message": "Аватар успешно удален"}
+        else:
+            raise HTTPException(status_code=404, detail="Аватар не найден")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при удалении аватара: {str(e)}")
 
 
 uvicorn.run(app, host=run_host, port=run_port)
