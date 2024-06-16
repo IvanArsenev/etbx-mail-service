@@ -64,10 +64,19 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 def get_user_by_email(email):
     return SessionLocal().query(User).filter(User.mail == email).first()
 
+def check_available_token(token):
+    try:
+        db = SessionLocal()
+        disabled_token = db.query(DisabledTokens).filter(DisabledTokens.token == token).first()
+        return disabled_token is not None
+    finally:
+        db.close()
 
 
 @app.get("/users/me")
 async def read_users_me(current_user: User = Depends(get_current_user)):
+    if check_available_token(current_user.token):
+        return {"message": "Войдите в систему!"}
     date_obj = datetime.strptime(current_user.birthday, "%d-%m-%Y")
     formatted_date_str = date_obj.strftime("%d.%m.%Y")
     user = {
@@ -88,7 +97,6 @@ async def get_users(page: int = Query(1, ge=1), page_size: int = Query(10, ge=1)
     db = SessionLocal()
     total_users = db.query(User).count()
     users = db.query(User).offset((page - 1) * page_size).limit(page_size).all()
-
     formatted_users = []
     for user in users:
         date_obj = datetime.strptime(user.birthday, "%d-%m-%Y")
@@ -103,7 +111,7 @@ async def get_users(page: int = Query(1, ge=1), page_size: int = Query(10, ge=1)
             Номер_телефона=user.phone_num if user.phone_num else "Отсутствует",
             Аватар=user.avatar
         ))
-
+    db.close()
     return {
         "total_users": total_users,
         "users": formatted_users
@@ -142,12 +150,15 @@ async def register_user(registration_request: RegistrationRequest):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-
+    db.close()
     return {"message": "User registered successfully"}
 
 @app.post("/login")
 async def login_for_access_token(form_data: LoginRequest):
     user = get_user_by_email(form_data.email)
+    if not(check_available_token(user.token)):
+        return {"message": "Вы уже в системе"}
+    
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -160,6 +171,12 @@ async def login_for_access_token(form_data: LoginRequest):
             detail="Неправильный логин или пароль",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    db = SessionLocal()
+    disabled_token = db.query(DisabledTokens).filter(DisabledTokens.token == user.token).first()
+    if disabled_token:
+        db.delete(disabled_token)
+        db.commit()
+    db.close()
     return {"Token": user.token}
 
 @app.get("/avatars/{image_name}")
@@ -168,6 +185,8 @@ def get_image(image_name: str):
 
 @app.put("/edit_avatar")
 async def edit_avatar(avatar: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    if check_available_token(current_user.token):
+        return {"message": "Войдите в систему!"}
     if not avatar.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="Неверный формат файла!")
     MAX_SIZE = 10 * 1024 * 1024
@@ -198,12 +217,15 @@ async def edit_avatar(avatar: UploadFile = File(...), current_user: dict = Depen
         db_user = db.query(User).filter(User.id == current_user.id).first()
         db_user.avatar = f"avatars/{current_user.id}.png"
         db.commit()
+        db.close()
         return {"message": "Аватар успешно обновлен"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при обработке файла: {str(e)}")
 
 @app.delete("/remove_avatar")
 async def remove_avatar(current_user: dict = Depends(get_current_user)):
+    if check_available_token(current_user.token):
+        return {"message": "Войдите в систему!"}
     try:
         avatar_path = Path(f"./avatars/{current_user.id}.png")
         if avatar_path.exists():
@@ -212,11 +234,47 @@ async def remove_avatar(current_user: dict = Depends(get_current_user)):
             db_user = db.query(User).filter(User.id == current_user.id).first()
             db_user.avatar = None
             db.commit()
+            db.close()
             return {"message": "Аватар успешно удален"}
         else:
             raise HTTPException(status_code=404, detail="Аватар не найден")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при удалении аватара: {str(e)}")
+
+@app.put("/edit")
+async def edit_me(updated_profile: EditProfile, current_user: dict = Depends(get_current_user)):
+    if check_available_token(current_user.token):
+        return {"message": "Войдите в систему!"}
+    fields_to_update = {}
+    if updated_profile.name is not None: fields_to_update['name'] = updated_profile.name
+    if updated_profile.surname is not None: fields_to_update['surname'] = updated_profile.surname
+    if updated_profile.birthday is not None: fields_to_update['birthday'] = updated_profile.birthday
+    if updated_profile.gender is not None: fields_to_update['gender'] = updated_profile.gender
+    if updated_profile.mail is not None: fields_to_update['mail'] = updated_profile.mail
+    if updated_profile.phone_num is not None: fields_to_update['phone_num'] = updated_profile.phone_num
+    if updated_profile.password is not None: fields_to_update['password'] = get_password_hash(updated_profile.password)
+    try:
+        db = SessionLocal()
+        db_user = db.query(User).filter(User.id == current_user.id).first()
+        for field, value in fields_to_update.items():
+            setattr(db_user, field, value)
+        db.commit()
+        db.close()
+        return {"message": "Профиль успешно обновлен"}
+    except:
+        raise HTTPException(status_code=400, detail="Ошибка при обновлении профиля")
+
+@app.post("/logout")
+async def logout(current_user: dict = Depends(get_current_user)):
+    if check_available_token(current_user.token):
+        return {"message": "Вы не в системе!"}
+    db = SessionLocal()
+    disabled_token = DisabledTokens(token=current_user.token)
+    db.add(disabled_token)
+    db.commit()
+    db.close()
+    return {"message": "Вы успешно вышли из системы"}
+
 
 
 uvicorn.run(app, host=run_host, port=run_port)

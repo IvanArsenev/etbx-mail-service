@@ -47,11 +47,19 @@ class UsersResponse(BaseModel):
     Пол: str
     Логин: str
     Номер_телефона: Optional[str]
-    Аватар: str
+    Аватар: Optional[str]
 
 class PaginatedUsersResponse(BaseModel):
     total_users: int
     users: List[UsersResponse]
 
-# Создание таблиц
+class EditProfile(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=50)
+    surname: Optional[str] = Field(None, min_length=2, max_length=50)
+    birthday: Optional[str] = Field(None, pattern=r'^\d{2}-\d{2}-\d{4}$')
+    gender: Optional[str] = Field(None, min_length=1, max_length=1)
+    mail: Optional[str] = Field(None, min_length=5, max_length=50)
+    phone_num: Optional[str] = Field(None, min_length=0, max_length=15)
+    password: Optional[str] = Field(None, min_length=6, max_length=50)
+
 Base.metadata.create_all(bind=create_engine(DATABASE_URL))
