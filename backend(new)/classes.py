@@ -1,8 +1,7 @@
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 from typing import Optional, List
-import re
 
 from config import *
 
@@ -25,7 +24,11 @@ class DisabledTokens(Base):
     __tablename__ = "disabledTokens"
     token = Column(String(150), primary_key=True)
 
-# Определение схемы запроса регистрации
+class UnhashedPasswords(Base):
+    __tablename__ = "pwds"
+    id = Column(Integer, primary_key=True, index=True)
+    password = Column(String(100))
+
 class RegistrationRequest(BaseModel):
     name: str = Field(..., min_length=2, max_length=50)
     surname: str = Field(..., min_length=2, max_length=50)

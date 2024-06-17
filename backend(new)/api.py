@@ -1,49 +1,42 @@
 import uvicorn, jwt
 from fastapi import Depends, status, FastAPI, HTTPException, Query, File, UploadFile
 from fastapi.staticfiles import StaticFiles
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic import BaseModel, Field
-from typing import Optional, List
-import re
+from fastapi.security import OAuth2PasswordBearer
 from pathlib import Path
 from PIL import Image
 import requests
-from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from config import *
 from classes import *
-from passlib.context import CryptContext
 from datetime import datetime
+from cryptography.fernet import Fernet
+
 
 
 app = FastAPI()
 
-
 app.mount("/avatars", StaticFiles(directory="avatars"), name="avatars")
 
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-
+cipher_suite = Fernet(FORNET_KEY)
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
+def encrypt_password(password: str) -> str:
+    return cipher_suite.encrypt(password.encode()).decode()
 
-def get_password_hash(password):
-    return pwd_context.hash(password)
+def decrypt_password(encrypted_password: str) -> str:
+    return cipher_suite.decrypt(encrypted_password.encode()).decode()
 
 def create_access_token(data: dict):
     to_encode = data.copy()
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
-
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
@@ -74,6 +67,8 @@ def check_available_token(token):
     finally:
         db.close()
 
+def login_and_fetch_emails(email_user, app_password, folder="inbox", imap_server="mail.pmc-python.ru"):
+    pass
 
 
 @app.get("/users/me")
@@ -96,7 +91,7 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
     return user
 
 @app.get("/users/{id}")
-async def read_users_me(id: str):
+async def read_user_id(id: str):
     user_db = SessionLocal().query(User).filter(User.id == id).first()
     date_obj = datetime.strptime(user_db.birthday, "%d-%m-%Y")
     formatted_date_str = date_obj.strftime("%d.%m.%Y")
@@ -141,6 +136,8 @@ async def get_users(page: int = Query(1, ge=1), page_size: int = Query(10, ge=1)
 async def register_user(registration_request: RegistrationRequest):
     db = SessionLocal()
     
+    encrypted_password = encrypt_password(registration_request.password)
+
     new_user = User(
         name=registration_request.name,
         surname=registration_request.surname,
@@ -148,7 +145,7 @@ async def register_user(registration_request: RegistrationRequest):
         gender=registration_request.gender,
         mail=f'{registration_request.mail}'+'@pmc-python.ru',
         phone_num=registration_request.phone_num,
-        password=get_password_hash(registration_request.password),
+        password=encrypted_password,
         token=create_access_token(data={"sub": registration_request.mail})
     )
     
@@ -185,7 +182,8 @@ async def login_for_access_token(form_data: LoginRequest):
             detail="Неправильный логин или пароль!",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if not verify_password(form_data.password, user.password):
+    decrypted_password = decrypt_password(user.password)
+    if form_data.password != decrypted_password:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Неправильный логин или пароль",
@@ -200,7 +198,7 @@ async def login_for_access_token(form_data: LoginRequest):
     return {"Token": user.token}
 
 @app.get("/avatars/{image_name}")
-def get_image(image_name: str):
+async def get_image(image_name: str):
     return {"message": f"Requesting image: {image_name}"}
 
 @app.put("/edit_avatar")
@@ -265,6 +263,7 @@ async def remove_avatar(current_user: dict = Depends(get_current_user)):
 async def edit_me(updated_profile: EditProfile, current_user: dict = Depends(get_current_user)):
     if check_available_token(current_user.token):
         return {"message": "Войдите в систему!"}
+    encrypted_password = encrypt_password(updated_profile.password)
     fields_to_update = {}
     if updated_profile.name is not None: fields_to_update['name'] = updated_profile.name
     if updated_profile.surname is not None: fields_to_update['surname'] = updated_profile.surname
@@ -272,7 +271,7 @@ async def edit_me(updated_profile: EditProfile, current_user: dict = Depends(get
     if updated_profile.gender is not None: fields_to_update['gender'] = updated_profile.gender
     if updated_profile.mail is not None: fields_to_update['mail'] = updated_profile.mail
     if updated_profile.phone_num is not None: fields_to_update['phone_num'] = updated_profile.phone_num
-    if updated_profile.password is not None: fields_to_update['password'] = get_password_hash(updated_profile.password)
+    if updated_profile.password is not None: fields_to_update['password'] = encrypted_password
     try:
         db = SessionLocal()
         db_user = db.query(User).filter(User.id == current_user.id).first()
@@ -294,6 +293,25 @@ async def logout(current_user: dict = Depends(get_current_user)):
     db.commit()
     db.close()
     return {"message": "Вы успешно вышли из системы"}
+
+@app.get("/messages/{folder}")
+async def get_messages(folder: str, current_user: dict = Depends(get_current_user)):
+    if not check_available_token(current_user.token):
+        return {"message": "Войдите в систему!"}
+    decoded_password = decrypt_password(current_user.password)
+    emails = login_and_fetch_emails(current_user.mail, decoded_password, folder)
+    formatted_emails = [
+        {
+            "id": email["id"],
+            "Тема": email["subject"],
+            "Сообщение": email["body"],
+            "Отправитель": email["sender"],
+            "Получатель": email["recipient"],
+            "Время получения": email["received_time"]
+        }
+        for email in emails
+    ]
+    return {"messages": formatted_emails}
 
 
 
