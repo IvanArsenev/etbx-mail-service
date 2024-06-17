@@ -19,7 +19,9 @@ from datetime import datetime
 
 app = FastAPI()
 
+
 app.mount("/avatars", StaticFiles(directory="avatars"), name="avatars")
+
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -73,6 +75,7 @@ def check_available_token(token):
         db.close()
 
 
+
 @app.get("/users/me")
 async def read_users_me(current_user: User = Depends(get_current_user)):
     if check_available_token(current_user.token):
@@ -89,6 +92,23 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
         "Номер_телефона": current_user.phone_num if current_user.phone_num else "Отсутствует",
         "Аватар": current_user.avatar,
         "token": current_user.token
+    }
+    return user
+
+@app.get("/users/{id}")
+async def read_users_me(id: str):
+    user_db = SessionLocal().query(User).filter(User.id == id).first()
+    date_obj = datetime.strptime(user_db.birthday, "%d-%m-%Y")
+    formatted_date_str = date_obj.strftime("%d.%m.%Y")
+    user = {
+        "id": user_db.id,
+        "Имя": user_db.name,
+        "Фамилия": user_db.surname,
+        "Дата рождения": formatted_date_str,
+        "Пол": user_db.gender,
+        "Логин": user_db.mail,
+        "Номер_телефона": user_db.phone_num if user_db.phone_num else "Отсутствует",
+        "Аватар": user_db.avatar
     }
     return user
 
