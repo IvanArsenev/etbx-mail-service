@@ -12,8 +12,10 @@ from config import *
 from classes import *
 from datetime import datetime
 from cryptography.fernet import Fernet
-
-
+from bs4 import BeautifulSoup
+import imaplib
+import email
+from email.header import decode_header
 
 app = FastAPI()
 
@@ -67,8 +69,70 @@ def check_available_token(token):
     finally:
         db.close()
 
-def login_and_fetch_emails(email_user, app_password, folder="inbox", imap_server="mail.pmc-python.ru"):
-    pass
+def login_and_fetch_emails(email_user, app_password, folder="All Mail", unseen = 'ALL', imap_server="mail.pmc-python.ru"):
+    mail = imaplib.IMAP4_SSL(imap_server, 993)
+    mail.login(email_user, app_password)
+    status, folders = mail.list()
+    mail.select(folder)
+    status, messages = mail.search(None, unseen)
+    mail_ids = messages[0].split()
+    emails = []
+    for mail_id in mail_ids:
+        status, msg_data = mail.fetch(mail_id, "(RFC822)")
+        for response_part in msg_data:
+            if isinstance(response_part, tuple):
+                msg = email.message_from_bytes(response_part[1])
+                subject, encoding = decode_header(msg["Subject"])[0]
+                if isinstance(subject, bytes):
+                    subject = subject.decode(encoding if encoding else "utf-8")
+                from_ = msg.get("From")
+                from_name, from_addr = email.utils.parseaddr(from_)
+                decoded_from_name, encoding = decode_header(from_name)[0]
+                if isinstance(decoded_from_name, bytes):
+                    decoded_from_name = decoded_from_name.decode(encoding if encoding else "utf-8")
+                from_ = f"{decoded_from_name} <{from_addr}>"
+                to = msg.get("To")
+                to_name, to_addr = email.utils.parseaddr(to)
+                decoded_to_name, encoding = decode_header(to_name)[0]
+                if isinstance(decoded_to_name, bytes):
+                    decoded_to_name = decoded_to_name.decode(encoding if encoding else "utf-8")
+                to = f"{decoded_to_name} <{to_addr}>"
+                date_ = msg.get("Date")
+                date_tuple = email.utils.parsedate_tz(date_)
+                local_date = datetime.fromtimestamp(email.utils.mktime_tz(date_tuple))
+                formatted_date = local_date.strftime("%H:%M %d.%m.%Y")
+                body = ""
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        content_type = part.get_content_type()
+                        content_disposition = str(part.get("Content-Disposition"))
+                        if "attachment" not in content_disposition:
+                            try:
+                                part_body = part.get_payload(decode=True).decode()
+                                if content_type == "text/plain":
+                                    body += part_body
+                                elif content_type == "text/html":
+                                    soup = BeautifulSoup(part_body, "html.parser")
+                                    body += soup.get_text()
+                            except:
+                                pass
+                else:
+                    body = msg.get_payload(decode=True).decode()
+                    if msg.get_content_type() == "text/html":
+                        soup = BeautifulSoup(body, "html.parser")
+                        body = soup.get_text()
+                email_data = {
+                    "id": mail_id.decode(),
+                    "subject": subject,
+                    "body": body.strip(),
+                    "sender": from_,
+                    "recipient": to,
+                    "received_time": formatted_date
+                }
+                emails.append(email_data)
+    mail.logout()
+    return emails
+    
 
 
 @app.get("/users/me")
@@ -296,10 +360,13 @@ async def logout(current_user: dict = Depends(get_current_user)):
 
 @app.get("/messages/{folder}")
 async def get_messages(folder: str, current_user: dict = Depends(get_current_user)):
-    if not check_available_token(current_user.token):
+    if check_available_token(current_user.token):
         return {"message": "Войдите в систему!"}
     decoded_password = decrypt_password(current_user.password)
-    emails = login_and_fetch_emails(current_user.mail, decoded_password, folder)
+    if folder == 'noread':
+        emails = login_and_fetch_emails(f'{current_user.mail}@pmc-python.ru', decoded_password, 'inbox', 'UNSEEN')
+    else:
+        emails = login_and_fetch_emails(f'{current_user.mail}@pmc-python.ru', decoded_password, folder)
     formatted_emails = [
         {
             "id": email["id"],
