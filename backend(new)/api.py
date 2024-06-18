@@ -6,7 +6,7 @@ from pathlib import Path
 from PIL import Image
 import requests
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
+import sqlalchemy.orm as sqlorm
 from sqlalchemy.orm import sessionmaker
 from config import *
 from classes import *
@@ -29,7 +29,7 @@ cipher_suite = Fernet(FORNET_KEY)
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+Base = sqlorm.declarative_base()
 
 
 
