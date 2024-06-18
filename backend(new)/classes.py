@@ -65,4 +65,9 @@ class EditProfile(BaseModel):
     phone_num: Optional[str] = Field(None, min_length=0, max_length=15)
     password: Optional[str] = Field(None, min_length=6, max_length=50)
 
+class Message(BaseModel):
+    theme: Optional[str] = None
+    body: str
+    receiver: str
+
 Base.metadata.create_all(bind=create_engine(DATABASE_URL))

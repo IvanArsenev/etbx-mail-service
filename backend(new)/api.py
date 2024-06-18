@@ -16,6 +16,9 @@ from bs4 import BeautifulSoup
 import imaplib
 import email
 from email.header import decode_header
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import smtplib
 
 app = FastAPI()
 
@@ -27,6 +30,7 @@ cipher_suite = Fernet(FORNET_KEY)
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
 
 
 def encrypt_password(password: str) -> str:
@@ -133,6 +137,23 @@ def login_and_fetch_emails(email_user, app_password, folder="All Mail", unseen =
     mail.logout()
     return emails
     
+def send_email(email_user, email_password, to_address, subject, message, smtp_server = "mail.pmc-python.ru", smtp_port = 587):
+    msg = MIMEMultipart()
+    msg['From'] = email_user
+    msg['To'] = to_address
+    msg['Subject'] = subject
+    msg.attach(MIMEText(message, 'plain'))
+    try:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(email_user, email_password)
+        server.send_message(msg)
+        return True
+    except Exception as e:
+        return False
+    finally:
+        server.quit()
+
 
 
 @app.get("/users/me")
@@ -380,6 +401,15 @@ async def get_messages(folder: str, current_user: dict = Depends(get_current_use
     ]
     return {"messages": formatted_emails}
 
-
+@app.post("/send")
+async def send_msg(message: Message, current_user: dict = Depends(get_current_user)):
+    if check_available_token(current_user.token):
+        return {"message": "Вы не в системе!"}
+    decoded_password = decrypt_password(current_user.password)
+    check = send_email(f'{current_user.mail}@pmc-python.ru', decoded_password, message.receiver, message.theme, message.body)
+    if check:
+        return {"message": "Сообщение отправлено"}
+    else:
+        return {"message": "Ошибка"}
 
 uvicorn.run(app, host=run_host, port=run_port)
