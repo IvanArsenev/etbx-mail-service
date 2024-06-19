@@ -3,9 +3,9 @@ import { Navigate } from 'react-router-dom';
 
 import UserAuth, { users } from './constants.ts';
 
-import styles from './Login.module.scss';
+import styles from './Users.module.scss';
 
-const Login: React.FC = () => {
+const Users: React.FC = () => {
     const [ isAuth, setIsAuth ] = useState<boolean>(false);
 
     if (isAuth) {
@@ -17,7 +17,7 @@ const Login: React.FC = () => {
         }
     };
 
-    const handleChoose = (event): void => {
+    const handleChoose = (event, id: number) => {
         const userBlocks = document.querySelectorAll(`.${styles.userBlock}`);
 
         // Удаление класса choosed у всех элементов
@@ -26,6 +26,7 @@ const Login: React.FC = () => {
         });
         
         const userBlock = event.currentTarget;
+        console.log(userBlock);
         const isChoosed = userBlock.classList.contains(styles.choosed);
         if (!isChoosed) {
             const firstChild = userBlock.querySelector(`#${userBlock.id}_click`);
@@ -33,7 +34,7 @@ const Login: React.FC = () => {
             const rect = userBlock.getBoundingClientRect();
             const offsetX = event.clientX - rect.left - rect.width/2;
             const offsetY = event.clientY - rect.top - rect.height/2;
-
+            console.log(offsetX, offsetY);
             let percentX = offsetX * 100 / rect.width;
             let percentY = offsetY * 100 / rect.height;
 
@@ -51,14 +52,15 @@ const Login: React.FC = () => {
                 }, 500);
             }, 600);
         }
+        window.location.pathname = `/users/${id}`;
+        // return <Navigate to={} />;
     };
 
     return (
-        <div className={styles.container}>
+        <>
             <div className={styles.wall}>
                 {users.map((user, index) => (
-                    <div style={{zIndex: users.length - user.id}} id={`user_${user.id}`} onClick={ (e) => handleChoose(e) } className={`${styles.userBlock}`}>
-                        <div id={`user_${user.id}_click`} className={styles.click}></div>
+                    <div style={{zIndex: users.length - index}} id={`user_${user.id}`} onClick={ (e) => handleChoose(e, index) } className={`${styles.userBlock}`}>
                         <img src="" alt="" className={styles.userAvatar} />
                         <div className={styles.userTop}>
                             <div className={styles.userName}>
@@ -71,13 +73,11 @@ const Login: React.FC = () => {
                                 {user.lastTheme}
                             </div>
                         </div>
+                        <div style={{zIndex: -100}} id={`user_${user.id}_click`} className={styles.click}></div>
                     </div>
                 ))}
-                
             </div>
-            <div className={styles.chat}>
-            </div>
-        </div>
+        </>
     );
 };
-export default Login;
+export default Users;

@@ -8,19 +8,35 @@ import { Navigate, type RouteObject, useRoutes } from 'react-router-dom';
 
 import './App.css'
 
-const Login = React.lazy(async () => await import('./pages/Login/Login.tsx'));
+const SideBar = React.lazy(async () => await import('./pages/SideBar/SideBar.tsx'));
+const Chat = React.lazy(async () => await import('./pages/Chat/Chat.tsx'));
+const Users = React.lazy(async () => await import('./pages/Users/Users.tsx'));
+const Chats = React.lazy(async () => await import('./pages/Chats/Chats.tsx'));
 const Registration = React.lazy(async () => await import('./pages/Registration/Registration.tsx'));
 
 const createRoutes = (): RouteObject[] => [
   {
     path: '/',
-    element: <Navigate to="/login" />,
+    element: <Navigate to="/registration" />,
     children: [
     ],
   },
   {
-    path: '/login',
-    element: <Login />,
+    path: '/users',
+    element: <>
+      <SideBar />
+      <Users />
+    </>,
+  },
+  {
+    path: '/users/:id',
+    element: (
+      <>
+        <SideBar />
+        <Chats />
+        <Chat />
+      </>
+    ),
   },
   {
     path: '/registration',
@@ -36,7 +52,13 @@ const App: React.FC = () => {
   const customRouter = useRoutes(createRoutes());
 
   return (
-    <Suspense>{customRouter}</Suspense>
+    <div className={'container'}>
+      <div style={{width: '100%', display: 'flex', height: '100vh'}}>
+        <Suspense>
+          {customRouter}
+        </Suspense>
+      </div>
+    </div>
   );
 };
 

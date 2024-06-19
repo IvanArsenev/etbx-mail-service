@@ -1,25 +1,9 @@
-.container {
-    height: 100vh;
-    width: 100vw;
-    position: fixed;
-    top: 0;
-    left: 0;
-    padding: 0;
-    margin: 0;
-    box-sizing: border-box;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    flex-direction: row;
-    display: block;
-    font-family: "Ubuntu Sans", sans-serif;
-}
-
 .wall {
     width: 500px;
     max-width: 1000px;
     height: 100vh;
-    display: inline-block;
+    display: flex;
+    flex-direction: column;
     scroll-behavior: smooth;
     overflow-wrap: break-word;
     overflow-y: scroll;
@@ -37,21 +21,6 @@
     background: transparent;
 }
 
-.chat {
-    width: calc(100% - 500px);
-    min-width: 1000px;
-    height: 100vh;
-    display: inline-block;
-    background-color: rgb(250, 250, 250);
-    scroll-behavior: smooth;
-    overflow-wrap: break-word;
-    overflow-y: scroll;
-    overflow-x: hidden;
-    scrollbar-width: none;
-    box-sizing: border-box;
-    z-index: 1;
-}
-
 .userBlock {
     border: 1px solid rgb(200, 200, 200);
     border-top: 0px;
@@ -61,6 +30,7 @@
     border-bottom-left-radius: 6px;
     border-bottom-right-radius: 6px;
     display: gird;
+    flex: none;
     position: relative;
     background-color: rgb(250, 250, 250);
     z-index: 2;
