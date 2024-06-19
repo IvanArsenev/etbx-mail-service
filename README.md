@@ -28,13 +28,14 @@
         "token" : "токен пользователя"
     }
 
+
 ### `POST http://etbx.ru:7070/login`
  
 **Параметры:**
 
  
     {
-        "email": "Логин без @pmc-python.ru",
+        "email": "Логин с указателем почты. Например: test@pmc-python.ru",
         "password": "Пароль"
     }
 
