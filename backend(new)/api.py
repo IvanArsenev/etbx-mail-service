@@ -1,4 +1,4 @@
-import uvicorn, jwt
+import uvicorn, jwt, re
 from fastapi import Depends, status, FastAPI, HTTPException, Query, File, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer
@@ -153,6 +153,17 @@ def send_email(email_user, email_password, to_address, subject, message, smtp_se
         return False
     finally:
         server.quit()
+
+def parse_datetime(datetime_str):
+    return datetime.strptime(datetime_str, "%H:%M %d.%m.%Y")
+
+def get_senders(combined_data, f_name):
+    senders = set()
+    for message in combined_data:
+        sender = message.get(f_name)
+        if sender:
+            senders.add(sender)
+    return list(senders)
 
 
 
@@ -402,9 +413,10 @@ async def get_messages(folder: str, current_user: dict = Depends(get_current_use
         return {"message": "Войдите в систему!"}
     decoded_password = decrypt_password(current_user.password)
     if folder == 'noread':
-        emails = login_and_fetch_emails(f'{current_user.mail}@pmc-python.ru', decoded_password, 'inbox', 'UNSEEN')
+        emails = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox', 'UNSEEN')
     else:
-        emails = login_and_fetch_emails(f'{current_user.mail}@pmc-python.ru', decoded_password, folder)
+        print(f'{current_user.mail}', decoded_password)
+        emails = login_and_fetch_emails(f'{current_user.mail}', decoded_password, folder)
     formatted_emails = [
         {
             "id": email["id"],
@@ -429,4 +441,80 @@ async def send_msg(message: Message, current_user: dict = Depends(get_current_us
     else:
         return {"message": "Ошибка"}
 
+@app.get("/get_my_chats")
+async def get_users_chats(current_user: dict = Depends(get_current_user)):
+    decoded_password = decrypt_password(current_user.password)
+    emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox')
+    senders_1 = get_senders(emails_in, 'sender')
+    emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent')
+    senders_2 = get_senders(emails_out, 'recipient')
+    combined_data = senders_1 + senders_2
+    email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
+    unique_emails = set()
+    for s in combined_data:
+        emails = re.findall(email_pattern, s)
+        unique_emails.update(emails)
+    unique_emails_list = list(unique_emails)
+    # sorted_messages = sorted(combined_data, key=lambda msg: parse_datetime(msg["Время получения"]))
+    return {"chats": unique_emails_list}
+    
+@app.get("/get_themes_of_chat/{interlocutor}")
+async def get_themes_of_chats(interlocutor: str, current_user: dict = Depends(get_current_user)):
+    decoded_password = decrypt_password(current_user.password)
+    emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox')
+    filtered_emails_in = [item for item in emails_in if interlocutor in item['sender']]
+    senders_1 = get_senders(filtered_emails_in, 'subject')
+    emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent')
+    filtered_emails_out = [item for item in emails_out if interlocutor in item['recipient']]
+    senders_2 = get_senders(filtered_emails_out, 'subject')
+    combined_data = senders_1 + senders_2
+    list_of_themes = []
+    for theme in combined_data:
+        if theme[0:4] == 'Re: ':
+            list_of_themes.append(theme[4:])
+        else:
+            list_of_themes.append(theme)
+    unique_emails_list = list(set(list_of_themes))
+    # sorted_messages = sorted(combined_data, key=lambda msg: parse_datetime(msg["Время получения"]))
+    return {"themes": unique_emails_list}
+
+@app.get("/get_messages_by_theme/{interlocutor}/{theme}")
+async def get_themes_of_chats(interlocutor: str, theme: str, current_user: dict = Depends(get_current_user)):
+    def clean_email_address(email):
+        match = re.search(r'[\w\.-]+@[\w\.-]+', email)
+        return match.group(0) if match else email
+    def clean_subject(subject):
+        return subject[4:] if subject.lower().startswith('re: ') else subject
+    def parse_received_time(received_time):
+        return datetime.strptime(received_time, "%H:%M %d.%m.%Y")
+    decoded_password = decrypt_password(current_user.password)
+    emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox')
+    filtered_emails_in = [
+        item for item in emails_in if interlocutor in item['sender'] and (theme == item['subject'] or theme == item['subject'][4:])
+    ]
+    emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent')
+    filtered_emails_out = [
+        item for item in emails_out if interlocutor in item['recipient'] and (theme == item['subject'] or theme == item['subject'][4:])
+    ]
+    combined_data = filtered_emails_in + filtered_emails_out
+    unique_emails_list = []
+    for email in combined_data:
+        cleaned_email = {
+            "id": email["id"],
+            "subject": clean_subject(email["subject"]),
+            "body": email["body"],
+            "sender": clean_email_address(email["sender"]),
+            "recipient": clean_email_address(email["recipient"]),
+            "received_time": email["received_time"],
+            "parsed_received_time": parse_received_time(email["received_time"])
+        }
+        unique_emails_list.append(cleaned_email)
+    unique_emails_list.sort(key=lambda x: x["parsed_received_time"])
+    for email in unique_emails_list:
+        del email["parsed_received_time"]
+    return {"messages": unique_emails_list}
+
+
 uvicorn.run(app, host=run_host, port=run_port)
+
+
