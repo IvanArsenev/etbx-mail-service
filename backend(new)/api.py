@@ -1,7 +1,8 @@
-import uvicorn, jwt, re
-from fastapi import Depends, status, FastAPI, HTTPException, Query, File, UploadFile
+import uvicorn, jwt, re, os
+from fastapi import Depends, status, FastAPI, HTTPException, Query, File, UploadFile, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.responses import FileResponse
 from pathlib import Path
 from PIL import Image
 import requests
@@ -32,6 +33,42 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = sqlorm.declarative_base()
 
 
+def delete_file(file_path: str):
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+def fetch_email_attachment(email_user, app_password, mail_id, filename, folder="All Mail", imap_server="mail.pmc-python.ru", save_path="files"):
+    mail = imaplib.IMAP4_SSL(imap_server, 993)
+    mail.login(email_user, app_password)
+    mail.select(folder)
+    status, messages = mail.search(None, 'ALL')
+    mail_ids = messages[0].split()
+    if mail_id.encode() not in mail_ids:
+        mail.logout()
+        raise HTTPException(status_code=404, detail="Сообщение не найдено")
+    status, msg_data = mail.fetch(mail_id, "(RFC822)")
+    for response_part in msg_data:
+        if isinstance(response_part, tuple):
+            msg = email.message_from_bytes(response_part[1])
+            if msg.is_multipart():
+                for part in msg.walk():
+                    content_disposition = str(part.get("Content-Disposition"))
+                    if "attachment" in content_disposition:
+                        part_filename = part.get_filename()
+                        if part_filename:
+                            decoded_filename, encoding = decode_header(part_filename)[0]
+                            if isinstance(decoded_filename, bytes):
+                                part_filename = decoded_filename.decode(encoding if encoding else "utf-8")
+                            if part_filename == filename:
+                                file_data = part.get_payload(decode=True)
+                                os.makedirs(save_path, exist_ok=True)
+                                file_path = os.path.join(save_path, f'{folder}_${mail_id}_${filename}')
+                                with open(file_path, "wb") as f:
+                                    f.write(file_data)
+                                mail.logout()
+                                return file_path, part.get_content_type()
+    mail.logout()
+    raise HTTPException(status_code=404, detail="Вложение не найдено")
 
 def encrypt_password(password: str) -> str:
     return cipher_suite.encrypt(password.encode()).decode()
@@ -73,7 +110,7 @@ def check_available_token(token):
     finally:
         db.close()
 
-def login_and_fetch_emails(email_user, app_password, folder="All Mail", unseen = 'ALL', imap_server="mail.pmc-python.ru"):
+def login_and_fetch_emails(email_user, app_password, folder="All Mail", unseen='ALL', imap_server="mail.pmc-python.ru"):
     mail = imaplib.IMAP4_SSL(imap_server, 993)
     mail.login(email_user, app_password)
     status, folders = mail.list()
@@ -86,7 +123,10 @@ def login_and_fetch_emails(email_user, app_password, folder="All Mail", unseen =
         for response_part in msg_data:
             if isinstance(response_part, tuple):
                 msg = email.message_from_bytes(response_part[1])
-                subject, encoding = decode_header(msg["Subject"])[0]
+                try:
+                    subject, encoding = decode_header(msg["Subject"])[0]
+                except:
+                    subject, encoding = decode_header("None")[0]
                 if isinstance(subject, bytes):
                     subject = subject.decode(encoding if encoding else "utf-8")
                 from_ = msg.get("From")
@@ -106,11 +146,20 @@ def login_and_fetch_emails(email_user, app_password, folder="All Mail", unseen =
                 local_date = datetime.fromtimestamp(email.utils.mktime_tz(date_tuple))
                 formatted_date = local_date.strftime("%H:%M %d.%m.%Y")
                 body = ""
+                files = []
                 if msg.is_multipart():
                     for part in msg.walk():
                         content_type = part.get_content_type()
                         content_disposition = str(part.get("Content-Disposition"))
-                        if "attachment" not in content_disposition:
+                        if "attachment" in content_disposition:
+                            filename = part.get_filename()
+                            if filename:
+                                decoded_filename, encoding = decode_header(filename)[0]
+                                if isinstance(decoded_filename, bytes):
+                                    filename = decoded_filename.decode(encoding if encoding else "utf-8")
+                                unique_filename = f"{folder}_${mail_id.decode()}_${filename}"
+                                files.append(unique_filename)
+                        else:
                             try:
                                 part_body = part.get_payload(decode=True).decode()
                                 if content_type == "text/plain":
@@ -131,12 +180,13 @@ def login_and_fetch_emails(email_user, app_password, folder="All Mail", unseen =
                     "body": body.strip(),
                     "sender": from_,
                     "recipient": to,
-                    "received_time": formatted_date
+                    "received_time": formatted_date,
+                    "files": files
                 }
                 emails.append(email_data)
     mail.logout()
     return emails
-    
+
 def send_email(email_user, email_password, to_address, subject, message, smtp_server = "mail.pmc-python.ru", smtp_port = 587):
     msg = MIMEMultipart()
     msg['From'] = email_user
@@ -424,7 +474,8 @@ async def get_messages(folder: str, current_user: dict = Depends(get_current_use
             "Сообщение": email["body"],
             "Отправитель": email["sender"],
             "Получатель": email["recipient"],
-            "Время получения": email["received_time"]
+            "Время получения": email["received_time"],
+            "Файлы": email["files"]
         }
         for email in emails
     ]
@@ -455,7 +506,6 @@ async def get_users_chats(current_user: dict = Depends(get_current_user)):
         emails = re.findall(email_pattern, s)
         unique_emails.update(emails)
     unique_emails_list = list(unique_emails)
-    # sorted_messages = sorted(combined_data, key=lambda msg: parse_datetime(msg["Время получения"]))
     return {"chats": unique_emails_list}
     
 @app.get("/get_themes_of_chat/{interlocutor}")
@@ -470,12 +520,14 @@ async def get_themes_of_chats(interlocutor: str, current_user: dict = Depends(ge
     combined_data = senders_1 + senders_2
     list_of_themes = []
     for theme in combined_data:
-        if theme[0:4] == 'Re: ':
-            list_of_themes.append(theme[4:])
-        else:
+        try:
+            if theme[0:4] == 'Re: ':
+                list_of_themes.append(theme[4:])
+            else:
+                list_of_themes.append(theme)
+        except:
             list_of_themes.append(theme)
     unique_emails_list = list(set(list_of_themes))
-    # sorted_messages = sorted(combined_data, key=lambda msg: parse_datetime(msg["Время получения"]))
     return {"themes": unique_emails_list}
 
 @app.get("/get_messages_by_theme/{interlocutor}/{theme}")
@@ -506,7 +558,8 @@ async def get_themes_of_chats(interlocutor: str, theme: str, current_user: dict 
             "sender": clean_email_address(email["sender"]),
             "recipient": clean_email_address(email["recipient"]),
             "received_time": email["received_time"],
-            "parsed_received_time": parse_received_time(email["received_time"])
+            "parsed_received_time": parse_received_time(email["received_time"]),
+            "files": email["files"]
         }
         unique_emails_list.append(cleaned_email)
     unique_emails_list.sort(key=lambda x: x["parsed_received_time"])
@@ -514,7 +567,15 @@ async def get_themes_of_chats(interlocutor: str, theme: str, current_user: dict 
         del email["parsed_received_time"]
     return {"messages": unique_emails_list}
 
+@app.get("/attachments/{folder}/{mail_id}/{file_name}")
+async def get_attachment(folder: str, mail_id: str, file_name: str, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
+    decoded_password = decrypt_password(current_user.password)
+    file_path, content_type = fetch_email_attachment(current_user.mail, decoded_password, mail_id, file_name, folder)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Файл не найден!")
+    background_tasks.add_task(delete_file, file_path)
+    return FileResponse(file_path, media_type=content_type, filename=file_name)
+
+
 
 uvicorn.run(app, host=run_host, port=run_port)
-
-
