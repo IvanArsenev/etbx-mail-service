@@ -13,7 +13,7 @@ class User(Base):
     name = Column(String(50))
     surname = Column(String(50))
     birthday = Column(String(10))
-    gender = Column(String(1))
+    gender = Column(String(6))
     mail = Column(String(50))
     phone_num = Column(String(15))
     password = Column(String(250))
@@ -33,7 +33,7 @@ class RegistrationRequest(BaseModel):
     name: str = Field(..., min_length=2, max_length=50)
     surname: str = Field(..., min_length=2, max_length=50)
     birthday: str = Field(..., pattern=r'^\d{2}-\d{2}-\d{4}$')
-    gender: str = Field(..., min_length=1, max_length=1)
+    gender: str = Field(..., min_length=4, max_length=6)
     mail: str = Field(..., min_length=5, max_length=50)
     phone_num: Optional[str] = Field(None, min_length=0, max_length=15)
     password: str = Field(..., min_length=6, max_length=50)
@@ -48,7 +48,7 @@ class UsersResponse(BaseModel):
     Фамилия: str
     Дата_рождения: str
     Пол: str
-    Логин: str
+    Почта: str
     Номер_телефона: Optional[str]
     Аватар: Optional[str]
 
@@ -61,9 +61,9 @@ class EditProfile(BaseModel):
     surname: Optional[str] = Field(None, min_length=2, max_length=50)
     birthday: Optional[str] = Field(None, pattern=r'^\d{2}-\d{2}-\d{4}$')
     gender: Optional[str] = Field(None, min_length=1, max_length=1)
-    mail: Optional[str] = Field(None, min_length=5, max_length=50)
     phone_num: Optional[str] = Field(None, min_length=0, max_length=15)
     password: Optional[str] = Field(None, min_length=6, max_length=50)
+    # mail: Optional[str] = Field(None, min_length=5, max_length=50)
 
 class Message(BaseModel):
     theme: Optional[str] = None

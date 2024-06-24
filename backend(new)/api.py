@@ -160,16 +160,14 @@ def send_email(email_user, email_password, to_address, subject, message, smtp_se
 async def read_users_me(current_user: User = Depends(get_current_user)):
     if check_available_token(current_user.token):
         return {"message": "Войдите в систему!"}
-    date_obj = datetime.strptime(current_user.birthday, "%d-%m-%Y")
-    formatted_date_str = date_obj.strftime("%d.%m.%Y")
     user = {
         "id": current_user.id,
         "Имя": current_user.name,
         "Фамилия": current_user.surname,
-        "Дата рождения": formatted_date_str,
+        "Дата рождения": current_user.birthday,
         "Пол": current_user.gender,
         "Логин": current_user.mail,
-        "Номер_телефона": current_user.phone_num if current_user.phone_num else "Отсутствует",
+        "Номер_телефона": current_user.phone_num if current_user.phone_num else None,
         "Аватар": current_user.avatar,
         "token": current_user.token
     }
@@ -178,16 +176,20 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
 @app.get("/users/{id}")
 async def read_user_id(id: str):
     user_db = SessionLocal().query(User).filter(User.id == id).first()
-    date_obj = datetime.strptime(user_db.birthday, "%d-%m-%Y")
-    formatted_date_str = date_obj.strftime("%d.%m.%Y")
+    if user_db is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Пользователь с id {id} не найден!",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     user = {
         "id": user_db.id,
         "Имя": user_db.name,
         "Фамилия": user_db.surname,
-        "Дата рождения": formatted_date_str,
+        "Дата рождения": user_db.birthday,
         "Пол": user_db.gender,
         "Логин": user_db.mail,
-        "Номер_телефона": user_db.phone_num if user_db.phone_num else "Отсутствует",
+        "Номер_телефона": user_db.phone_num if user_db.phone_num else None,
         "Аватар": user_db.avatar
     }
     return user
@@ -199,16 +201,14 @@ async def get_users(page: int = Query(1, ge=1), page_size: int = Query(10, ge=1)
     users = db.query(User).offset((page - 1) * page_size).limit(page_size).all()
     formatted_users = []
     for user in users:
-        date_obj = datetime.strptime(user.birthday, "%d-%m-%Y")
-        formatted_date_str = date_obj.strftime("%d.%m.%Y")
         formatted_users.append(UsersResponse(
             id=user.id,
             Имя=user.name,
             Фамилия=user.surname,
-            Дата_рождения=formatted_date_str,
+            Дата_рождения=user.birthday,
             Пол=user.gender,
-            Логин=user.mail,
-            Номер_телефона=user.phone_num if user.phone_num else "Отсутствует",
+            Почта=user.mail,
+            Номер_телефона=user.phone_num if user.phone_num else None,
             Аватар=user.avatar
         ))
     db.close()
@@ -220,47 +220,47 @@ async def get_users(page: int = Query(1, ge=1), page_size: int = Query(10, ge=1)
 @app.post("/register")
 async def register_user(registration_request: RegistrationRequest):
     db = SessionLocal()
-    
+    existing_user = db.query(User).filter(User.mail == f'{registration_request.mail}@pmc-python.ru').first()
+    if existing_user:
+        db.close()
+        raise HTTPException(status_code=400, detail="Пользователь с таким логином уже зарегистрирован")
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    response = requests.get(f"https://pmc-python.ru/api/v1/user/{registration_request.mail}@pmc-python.ru", headers=headers)
+    if response:
+        db.close()
+        raise HTTPException(status_code=400, detail="Пользователь с таким логином уже зарегистрирован")
     encrypted_password = encrypt_password(registration_request.password)
-
     new_user = User(
         name=registration_request.name,
         surname=registration_request.surname,
         birthday=registration_request.birthday,
         gender=registration_request.gender,
-        mail=f'{registration_request.mail}'+'@pmc-python.ru',
+        mail=f'{registration_request.mail}@pmc-python.ru',
         phone_num=registration_request.phone_num,
         password=encrypted_password,
-        token=create_access_token(data={"sub": registration_request.mail})
+        token=create_access_token(data={"sub": f'{registration_request.mail}@pmc-python.ru'})
     )
-    
     external_api_data = {
-        "email": str(registration_request.mail)+'@pmc-python.ru',
+        "email": f'{registration_request.mail}@pmc-python.ru',
         "raw_password": registration_request.password,
         "displayed_name": f"{registration_request.name} {registration_request.surname}"
     }
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
     response = requests.post("https://pmc-python.ru/api/v1/user", json=external_api_data, headers=headers)
-
     if response.status_code != 201 and response.status_code != 200:
-        raise HTTPException(status_code=response.status_code, detail="Registration failed on external server.")
-    
+        db.close()
+        raise HTTPException(status_code=502, detail=f"Ошибка регистрации на внешнем сервере. Текст ошибки: {response.text}")
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     db.close()
-    return {"message": "User registered successfully"}
+    return {"Token": new_user.token}
 
 @app.post("/login")
 async def login_for_access_token(form_data: LoginRequest):
     user = get_user_by_email(form_data.email)
-    if not(check_available_token(user.token)):
-        return {"message": "Вы уже в системе"}
-    
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -274,6 +274,8 @@ async def login_for_access_token(form_data: LoginRequest):
             detail="Неправильный логин или пароль",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    if not(check_available_token(user.token)):
+        return {"Token": user.token}
     db = SessionLocal()
     disabled_token = db.query(DisabledTokens).filter(DisabledTokens.token == user.token).first()
     if disabled_token:
@@ -348,15 +350,30 @@ async def remove_avatar(current_user: dict = Depends(get_current_user)):
 async def edit_me(updated_profile: EditProfile, current_user: dict = Depends(get_current_user)):
     if check_available_token(current_user.token):
         return {"message": "Войдите в систему!"}
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
     encrypted_password = encrypt_password(updated_profile.password)
     fields_to_update = {}
     if updated_profile.name is not None: fields_to_update['name'] = updated_profile.name
+    else: fields_to_update['name'] = current_user.name
     if updated_profile.surname is not None: fields_to_update['surname'] = updated_profile.surname
+    else: fields_to_update['surname'] = current_user.surname
     if updated_profile.birthday is not None: fields_to_update['birthday'] = updated_profile.birthday
     if updated_profile.gender is not None: fields_to_update['gender'] = updated_profile.gender
-    if updated_profile.mail is not None: fields_to_update['mail'] = updated_profile.mail
+    # if updated_profile.mail is not None: fields_to_update['mail'] = updated_profile.mail
     if updated_profile.phone_num is not None: fields_to_update['phone_num'] = updated_profile.phone_num
     if updated_profile.password is not None: fields_to_update['password'] = encrypted_password
+    else: fields_to_update['password'] = encrypt_password(current_user.password)
+
+    external_api_data = {
+        "raw_password": fields_to_update['password'],
+        "displayed_name": f"{fields_to_update['name']} {fields_to_update['surname']}"
+    }
+    response = requests.patch(f"https://pmc-python.ru/api/v1/user/{current_user.mail}", json=external_api_data, headers=headers)
+    if response.status_code != 201 and response.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"Ошибка изменения данных на внешнем сервере. Текст ошибки: {response.text}")
     try:
         db = SessionLocal()
         db_user = db.query(User).filter(User.id == current_user.id).first()
@@ -366,7 +383,7 @@ async def edit_me(updated_profile: EditProfile, current_user: dict = Depends(get
         db.close()
         return {"message": "Профиль успешно обновлен"}
     except:
-        raise HTTPException(status_code=400, detail="Ошибка при обновлении профиля")
+        raise HTTPException(status_code=500, detail="Ошибка при обновлении профиля")
 
 @app.post("/logout")
 async def logout(current_user: dict = Depends(get_current_user)):
@@ -406,7 +423,7 @@ async def send_msg(message: Message, current_user: dict = Depends(get_current_us
     if check_available_token(current_user.token):
         return {"message": "Вы не в системе!"}
     decoded_password = decrypt_password(current_user.password)
-    check = send_email(f'{current_user.mail}@pmc-python.ru', decoded_password, message.receiver, message.theme, message.body)
+    check = send_email(f'{current_user.mail}', decoded_password, message.receiver, message.theme, message.body)
     if check:
         return {"message": "Сообщение отправлено"}
     else:
