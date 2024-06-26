@@ -1,8 +1,9 @@
-import uvicorn, jwt, re, os
+import uvicorn, jwt, re, os, logging
 from fastapi import Depends, status, FastAPI, HTTPException, Query, File, UploadFile, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from PIL import Image
 import requests
@@ -21,7 +22,17 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import smtplib
 
+logging.basicConfig(filename='app.log', level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
+
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Разрешить доступ с любых доменов
+    allow_credentials=True,
+    allow_methods=["*"],  # Разрешить все методы (GET, POST, PUT и т.д.)
+    allow_headers=["*"],  # Разрешить все заголовки
+)
 
 app.mount("/avatars", StaticFiles(directory="avatars"), name="avatars")
 
@@ -36,12 +47,16 @@ Base = sqlorm.declarative_base()
 def delete_file(file_path: str):
     if os.path.exists(file_path):
         os.remove(file_path)
+        logging.info(f"Deleted file: {file_path}")
+    else:
+        logging.warning(f"File not found during delete operation: {file_path}")
 
 def fetch_email_attachment(email_user, app_password, mail_id, filename, folder="All Mail", imap_server="mail.pmc-python.ru", save_path="files"):
     mail = imaplib.IMAP4_SSL(imap_server, 993)
     try:
         mail.login(email_user, app_password)
-    except:
+    except Exception as e:
+        logging.error(f"IMAP login failed for {email_user}: {str(e)}")
         return 'Error', ''
     mail.select(folder)
     status, messages = mail.search(None, 'ALL')
@@ -69,6 +84,7 @@ def fetch_email_attachment(email_user, app_password, mail_id, filename, folder="
                                 with open(file_path, "wb") as f:
                                     f.write(file_data)
                                 mail.logout()
+                                logging.info(f"Saved attachment: {file_path}")
                                 return file_path, part.get_content_type()
     mail.logout()
     raise HTTPException(status_code=404, detail="Вложение не найдено")
@@ -195,8 +211,9 @@ def login_and_fetch_emails(email_user, app_password, folder="All Mail", unseen='
                                 elif content_type == "text/html":
                                     soup = BeautifulSoup(part_body, "html.parser")
                                     body += soup.get_text()
-                            except:
-                                pass
+                            except Exception as e:
+                                print(f"Unexpected error: {e}")
+                                raise
                 else:
                     body = msg.get_payload(decode=True).decode()
                     if msg.get_content_type() == "text/html":
@@ -349,9 +366,11 @@ async def register_user(registration_request: RegistrationRequest):
 @app.post("/login", tags=["Auth"])
 async def login_for_access_token(form_data: LoginRequest):
     mail_ru_domens = ['mail.ru', 'internet.ru', 'bk.ru', 'inbox.ru', 'list.ru']
+    logging.info(f"Попытка входа с email: {form_data.email}")
     if form_data.email.split('@')[1] == "pmc-python.ru":
         user = get_user_by_email(form_data.email)
         if not user:
+            logging.warning("Пользователь не найден")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Неправильный логин или пароль!",
@@ -359,6 +378,7 @@ async def login_for_access_token(form_data: LoginRequest):
             )
         decrypted_password = decrypt_password(user.password)
         if form_data.password != decrypted_password:
+            logging.warning("Неправильный пароль")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Неправильный логин или пароль",
@@ -378,6 +398,7 @@ async def login_for_access_token(form_data: LoginRequest):
         try:
             mail.login(f'{form_data.email}', f'{form_data.password}')
         except:
+            logging.error("Ошибка входа")
             return {"message": "Ошибка. Некорректные данные для входа!"}
         db = SessionLocal()
         encrypted_password = encrypt_password(form_data.password)
@@ -401,6 +422,7 @@ async def login_for_access_token(form_data: LoginRequest):
         db.close()
         return {"Token": new_user.token}
     else:
+        logging.error("Некорректные данные для входа")
         return {"message": "Ошибка. Некорректные данные для входа!"}
 
 @app.get("/avatars/{image_name}", tags=["Users"])
@@ -686,5 +708,8 @@ async def get_attachment(folder: str, mail_id: str, file_name: str, background_t
     background_tasks.add_task(delete_file, file_path)
     return FileResponse(file_path, media_type=content_type, filename=file_name)
 
+@app.get("/")
+async def test():
+    return {"message": "Ok!"}
 
 uvicorn.run(app, host=run_host, port=run_port)
