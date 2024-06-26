@@ -324,20 +324,31 @@ async def get_users(page: int = Query(1, ge=1), page_size: int = Query(10, ge=1)
 
 @app.post("/register", tags=["Auth"])
 async def register_user(registration_request: RegistrationRequest):
+    logging.info(f"Регистрация пользователя с почтой: {registration_request.mail}@pmc-python.ru")
+
     db = SessionLocal()
+    logging.debug("Создание подключения к базе данных")
+
     existing_user = db.query(User).filter(User.mail == f'{registration_request.mail}@pmc-python.ru').first()
     if existing_user:
+        logging.warning(f"Пользователь с почтой {registration_request.mail}@pmc-python.ru уже зарегистрирован")
         db.close()
         raise HTTPException(status_code=400, detail="Пользователь с таким логином уже зарегистрирован")
+
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
     }
+
     response = requests.get(f"https://pmc-python.ru/api/v1/user/{registration_request.mail}@pmc-python.ru", headers=headers)
     if response:
+        logging.warning(f"Запрос к внешнему API вернул успешный ответ. Пользователь уже существует.")
         db.close()
         raise HTTPException(status_code=400, detail="Пользователь с таким логином уже зарегистрирован")
+
     encrypted_password = encrypt_password(registration_request.password)
+    logging.debug("Шифрование пароля")
+
     new_user = User(
         name=registration_request.name,
         surname=registration_request.surname,
@@ -348,20 +359,27 @@ async def register_user(registration_request: RegistrationRequest):
         password=encrypted_password,
         token=create_access_token(data={"sub": f'{registration_request.mail}@pmc-python.ru'})
     )
+
     external_api_data = {
         "email": f'{registration_request.mail}@pmc-python.ru',
         "raw_password": registration_request.password,
         "displayed_name": f"{registration_request.name} {registration_request.surname}"
     }
+
     response = requests.post("https://pmc-python.ru/api/v1/user", json=external_api_data, headers=headers)
     if response.status_code != 201 and response.status_code != 200:
+        logging.error(f"Ошибка регистрации на внешнем сервере. Код ошибки: {response.status_code}. Текст ошибки: {response.text}")
         db.close()
         raise HTTPException(status_code=502, detail=f"Ошибка регистрации на внешнем сервере. Текст ошибки: {response.text}")
+
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     db.close()
+
+    logging.info(f"Пользователь успешно зарегистрирован. Почта: {new_user.mail}")
     return {"Token": new_user.token}
+
 
 @app.post("/login", tags=["Auth"])
 async def login_for_access_token(form_data: LoginRequest):
