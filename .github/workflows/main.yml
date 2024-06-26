@@ -23,7 +23,7 @@ jobs:
 
     - name: Download and run OWASP Dependency-Check
       run: |
-        curl -L -o dependency-check.zip https://dl.bintray.com/jeremy-long/owasp/dependency-check-6.1.5-release.zip
+        wget -O dependency-check.zip https://dl.bintray.com/jeremy-long/owasp/dependency-check-6.1.5-release.zip
 
         if [ ! -f dependency-check.zip ]; then
           echo "Failed to download dependency-check.zip"
