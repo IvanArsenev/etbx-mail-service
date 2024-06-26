@@ -24,11 +24,14 @@ jobs:
     - name: Download and run OWASP Dependency-Check
       run: |
         curl -L -o dependency-check.zip https://dl.bintray.com/jeremy-long/owasp/dependency-check-6.1.5-release.zip
+
         if [ ! -f dependency-check.zip ]; then
           echo "Failed to download dependency-check.zip"
           exit 1
         fi
+        
         unzip dependency-check.zip
+
         ./dependency-check/bin/dependency-check.sh --project "My Python Project" --scan . --format "HTML" --out ./dependency-check-report
 
     - name: Upload Dependency-Check report
