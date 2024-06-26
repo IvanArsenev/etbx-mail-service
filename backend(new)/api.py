@@ -142,9 +142,19 @@ def login_and_fetch_emails(email_user, app_password, folder="All Mail", unseen='
                     decoded_to_name = decoded_to_name.decode(encoding if encoding else "utf-8")
                 to = f"{decoded_to_name} <{to_addr}>"
                 date_ = msg.get("Date")
-                date_tuple = email.utils.parsedate_tz(date_)
-                local_date = datetime.fromtimestamp(email.utils.mktime_tz(date_tuple))
-                formatted_date = local_date.strftime("%H:%M %d.%m.%Y")
+                date_tuple = None
+                if date_ is None:
+                    received_header = msg.get("Received")
+                    if received_header:
+                        date_part = received_header.split(';')[-1].strip()
+                        date_tuple = email.utils.parsedate_tz(date_part)
+                else:
+                    date_tuple = email.utils.parsedate_tz(date_)
+                if date_tuple:
+                    local_date = datetime.fromtimestamp(email.utils.mktime_tz(date_tuple))
+                    formatted_date = local_date.strftime("%H:%M %d.%m.%Y")
+                else:
+                    formatted_date = "Не удалось распознать дату"
                 body = ""
                 files = []
                 if msg.is_multipart():
