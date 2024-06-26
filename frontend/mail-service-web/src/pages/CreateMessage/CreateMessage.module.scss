@@ -1,0 +1,54 @@
+.createMessage {
+  display: flex;
+  flex-direction: row;
+  height: fit-content;
+  width: 100%;
+  border-top: 1px solid rgb(200, 200, 200);
+  padding: 5px;
+  box-sizing: border-box;
+}
+
+.emodjiButton {
+  display: flex;
+  width: 50px;
+  height: 100%;
+  flex: none;
+  align-self: flex-end;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.inputText {
+  display: flex;
+  border: 0;
+  resize: none;
+  min-height: 50px;
+  max-height: 400px;
+  width: 100%;
+  color: rgb(10, 10, 10);
+  font-size: 14pt;
+  border-radius: 6px;
+  padding: 6px;
+  border: 1px solid rgb(200, 200, 200);
+  outline: none;
+}
+
+.attachButton {
+  display: flex;
+  width: 50px;
+  height: 100%;
+  flex: none;
+  align-self: flex-end;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.sendButton {
+  display: flex;
+  width: 50px;
+  height: 100%;
+  flex: none;
+  align-self: flex-end;
+  justify-content: center;
+  flex-direction: column;
+}

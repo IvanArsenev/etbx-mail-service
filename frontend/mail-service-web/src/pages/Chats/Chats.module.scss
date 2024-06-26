@@ -1,0 +1,153 @@
+.container {
+  height: 100vh;
+  width: 100vw;
+  position: fixed;
+  top: 0;
+  left: 0;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  flex-direction: row;
+  display: block;
+  font-family: "Ubuntu Sans", sans-serif;
+}
+
+.wall {
+  width: 500px;
+  max-width: 1000px;
+  height: 100vh;
+  display: inline-block;
+  scroll-behavior: smooth;
+  overflow-wrap: break-word;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  box-sizing: border-box;
+  z-index: 100;
+  background-color: rgb(250, 250, 250);
+  border-right: 1px solid rgb(200, 200, 200);
+  text-align: left;
+}
+::-webkit-scrollbar{
+  width: 0px;
+  display: none;
+  background: transparent;
+}
+
+.chat {
+  width: calc(100% - 500px);
+  min-width: 1000px;
+  height: 100vh;
+  display: inline-block;
+  background-color: rgb(250, 250, 250);
+  scroll-behavior: smooth;
+  overflow-wrap: break-word;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  box-sizing: border-box;
+  z-index: 1;
+}
+
+.themeBlock {
+  border: 1px solid rgb(200, 200, 200);
+  border-top: 0px;
+  width: calc(100% - 1px);
+  height: 120px;
+  margin-top: -10px;
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
+  display: gird;
+  position: relative;
+  background-color: rgb(250, 250, 250);
+  z-index: 2;
+  overflow-y: hidden;
+  overflow-x: hidden;
+}
+
+.choosed {
+  background-color: rgb(241, 238, 255);
+}
+
+.themeAvatar {
+  height: 80px;
+  aspect-ratio: 1/1;
+  border-radius: 1000px;
+  border: 1px solid rgba(0, 0, 0, 0);
+  font-size: large;
+  background-color: rgb(0, 0, 0);
+  display: inline-block;
+  vertical-align: top;
+  box-sizing: border-box;
+  margin-top: 20px;
+  margin-left: 10px;
+  z-index: 2;
+}
+
+.themeTop {
+  margin-top: 20px;
+  width: calc(100% - 100px);
+  height: calc(100% - 20px);
+  display: inline-block;
+  vertical-align: top;
+  z-index: 2;
+}
+
+.themeName {
+  display: inline-block;
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: 10px;
+  height: 30px;
+  overflow-x: scroll;
+  scrollbar-width: none;
+  font-size: 16pt;
+  color: rgb(10, 10, 10);
+  font-weight: 500;
+  z-index: 2;
+}
+
+.themeLastDate {
+  display: inline-block;
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: 10px;
+  height: 20px;
+  overflow-x: scroll;
+  scrollbar-width: none;
+  font-size: 10pt;
+  color: rgb(100, 100, 100);
+  font-weight: 800;
+  z-index: 2;
+}
+
+.themeLastTheme {
+  display: inline-block;
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: 10px;
+  height: 30px;
+  overflow-x: scroll;
+  scrollbar-width: none;
+  font-size: 14pt;
+  color: rgb(100, 100, 100);
+  font-weight: 600;
+  z-index: 2;
+}
+
+.click {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 0%;
+  border-radius: 1000px;
+  aspect-ratio: 1 / 1;
+  background-color: rgb(195, 182, 255);
+  display: flex;
+  z-index: -6;
+  transition: width 0.5s, background-color 0.5s;
+}
