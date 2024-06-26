@@ -120,8 +120,20 @@ def login_and_fetch_emails(email_user, app_password, folder="All Mail", unseen='
     except:
         return 'Error'
     status, folders = mail.list()
-    mail.select(folder)
-    status, messages = mail.search(None, unseen)
+    try:
+        mail.select(folder)
+        status, messages = mail.search(None, unseen)
+    except:
+        if folder == 'Sent':
+            for index, folder in enumerate(folders):
+                if b'\\Sent' in folder:
+                    decoded_folder = folder.decode('utf-8')
+                    match = re.search(r'"/" "([^"]+)"', decoded_folder)
+                    mail.select(match.group(1))
+                    status, messages = mail.search(None, unseen)
+                    break
+        else:
+            return 'Error'
     mail_ids = messages[0].split()
     emails = []
     for mail_id in mail_ids:
@@ -232,7 +244,6 @@ def get_senders(combined_data, f_name):
     return list(senders)
 
 
-
 @app.get("/users/me", tags=["Profile"])
 async def read_users_me(current_user: User = Depends(get_current_user)):
     if check_available_token(current_user.token):
@@ -337,29 +348,60 @@ async def register_user(registration_request: RegistrationRequest):
 
 @app.post("/login", tags=["Auth"])
 async def login_for_access_token(form_data: LoginRequest):
-    user = get_user_by_email(form_data.email)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неправильный логин или пароль!",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    decrypted_password = decrypt_password(user.password)
-    if form_data.password != decrypted_password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неправильный логин или пароль",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    if not(check_available_token(user.token)):
+    mail_ru_domens = ['mail.ru', 'internet.ru', 'bk.ru', 'inbox.ru', 'list.ru']
+    if form_data.email.split('@')[1] == "pmc-python.ru":
+        user = get_user_by_email(form_data.email)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Неправильный логин или пароль!",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        decrypted_password = decrypt_password(user.password)
+        if form_data.password != decrypted_password:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Неправильный логин или пароль",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if not(check_available_token(user.token)):
+            return {"Token": user.token}
+        db = SessionLocal()
+        disabled_token = db.query(DisabledTokens).filter(DisabledTokens.token == user.token).first()
+        if disabled_token:
+            db.delete(disabled_token)
+            db.commit()
+        db.close()
         return {"Token": user.token}
-    db = SessionLocal()
-    disabled_token = db.query(DisabledTokens).filter(DisabledTokens.token == user.token).first()
-    if disabled_token:
-        db.delete(disabled_token)
+    elif form_data.email.split('@')[1] in mail_ru_domens:
+        mail = imaplib.IMAP4_SSL('imap.mail.ru', 993)
+        try:
+            mail.login(f'{form_data.email}', f'{form_data.password}')
+        except:
+            return {"message": "Ошибка. Некорректные данные для входа!"}
+        db = SessionLocal()
+        encrypted_password = encrypt_password(form_data.password)
+        user_name = 'Имя'
+        user_surname = 'Фамилия'
+        user_birthday = '01-01-2000'
+        user_gender = 'None'
+        new_user = User(
+            name=user_name,
+            surname=user_surname,
+            birthday=user_birthday,
+            gender=user_gender,
+            mail=form_data.email,
+            phone_num=None,
+            password=encrypted_password,
+            token=create_access_token(data={"sub": f'{form_data.email}'})
+        )
+        db.add(new_user)
         db.commit()
-    db.close()
-    return {"Token": user.token}
+        db.refresh(new_user)
+        db.close()
+        return {"Token": new_user.token}
+    else:
+        return {"message": "Ошибка. Некорректные данные для входа!"}
 
 @app.get("/avatars/{image_name}", tags=["Users"])
 async def get_image(image_name: str):
@@ -425,6 +467,8 @@ async def remove_avatar(current_user: dict = Depends(get_current_user)):
 
 @app.put("/edit", tags=["Profile"])
 async def edit_me(updated_profile: EditProfile, current_user: dict = Depends(get_current_user)):
+    if current_user.mail.split('@')[1] != "pmc-python.ru" and updated_profile.password is not None:
+        return {"message": "Вы не можете измениить пароль от импортированного аккаунта!"}
     if check_available_token(current_user.token):
         return {"message": "Войдите в систему!"}
     headers = {
@@ -478,11 +522,16 @@ async def get_messages(folder: str, current_user: dict = Depends(get_current_use
     if check_available_token(current_user.token):
         return {"message": "Войдите в систему!"}
     decoded_password = decrypt_password(current_user.password)
-    if folder == 'noread':
-        emails = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox', 'UNSEEN')
+    if current_user.mail.split('@')[1] != "pmc-python.ru":
+        if folder == 'noread':
+            emails = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox', 'UNSEEN', imap_server='imap.mail.ru')
+        else:
+            emails = login_and_fetch_emails(f'{current_user.mail}', decoded_password, folder, imap_server='imap.mail.ru')
     else:
-        print(f'{current_user.mail}', decoded_password)
-        emails = login_and_fetch_emails(f'{current_user.mail}', decoded_password, folder)
+        if folder == 'noread':
+            emails = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox', 'UNSEEN')
+        else:
+            emails = login_and_fetch_emails(f'{current_user.mail}', decoded_password, folder)
     formatted_emails = [
         {
             "id": email["id"],
@@ -502,7 +551,10 @@ async def send_msg(message: Message, current_user: dict = Depends(get_current_us
     if check_available_token(current_user.token):
         return {"message": "Вы не в системе!"}
     decoded_password = decrypt_password(current_user.password)
-    check = send_email(f'{current_user.mail}', decoded_password, message.receiver, message.theme, message.body)
+    if current_user.mail.split('@')[1] != "pmc-python.ru":
+        check = send_email(f'{current_user.mail}', decoded_password, message.receiver, message.theme, message.body, smtp_server = 'imap.mail.ru')
+    else:
+        check = send_email(f'{current_user.mail}', decoded_password, message.receiver, message.theme, message.body)
     if check:
         return {"message": "Сообщение отправлено"}
     else:
@@ -511,12 +563,22 @@ async def send_msg(message: Message, current_user: dict = Depends(get_current_us
 @app.get("/get_my_chats", tags=["Chat"])
 async def get_users_chats(current_user: dict = Depends(get_current_user)):
     decoded_password = decrypt_password(current_user.password)
-    emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox')
-    if emails_in == 'Error': return {"message": "Ошибка. Некорректный токен!"}
-    senders_1 = get_senders(emails_in, 'sender')
-    emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent')
-    if emails_out == 'Error': return {"message": "Ошибка. Некорректный токен!"}
-    senders_2 = get_senders(emails_out, 'recipient')
+    if current_user.mail.split('@')[1] != "pmc-python.ru":
+        emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent', imap_server = 'imap.mail.ru')
+        if emails_out == 'Error': return {"message": "Ошибка. Некорректный токен!"}
+        senders_2 = get_senders(emails_out, 'recipient')
+
+        emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox', imap_server = 'imap.mail.ru')
+        if emails_in == 'Error': return {"message": "Ошибка. Некорректный токен!"}
+        senders_1 = get_senders(emails_in, 'sender')
+        
+    else:
+        emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox')
+        if emails_in == 'Error': return {"message": "Ошибка. Некорректный токен!"}
+        senders_1 = get_senders(emails_in, 'sender')
+        emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent')
+        if emails_out == 'Error': return {"message": "Ошибка. Некорректный токен!"}
+        senders_2 = get_senders(emails_out, 'recipient')
     combined_data = senders_1 + senders_2
     email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
     unique_emails = set()
@@ -529,14 +591,24 @@ async def get_users_chats(current_user: dict = Depends(get_current_user)):
 @app.get("/get_themes_of_chat/{interlocutor}", tags=["Chat"])
 async def get_themes_of_chats(interlocutor: str, current_user: dict = Depends(get_current_user)):
     decoded_password = decrypt_password(current_user.password)
-    emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox')
-    if emails_in == 'Error': return {"message": "Ошибка. Некорректный токен!"}
-    filtered_emails_in = [item for item in emails_in if interlocutor in item['sender']]
-    senders_1 = get_senders(filtered_emails_in, 'subject')
-    emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent')
-    if emails_out == 'Error': return {"message": "Ошибка. Некорректный токен!"}
-    filtered_emails_out = [item for item in emails_out if interlocutor in item['recipient']]
-    senders_2 = get_senders(filtered_emails_out, 'subject')
+    if current_user.mail.split('@')[1] != "pmc-python.ru":
+        emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox', imap_server = 'imap.mail.ru')
+        if emails_in == 'Error': return {"message": "Ошибка. Некорректный токен!"}
+        filtered_emails_in = [item for item in emails_in if interlocutor in item['sender']]
+        senders_1 = get_senders(filtered_emails_in, 'subject')
+        emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent', imap_server = 'imap.mail.ru')
+        if emails_out == 'Error': return {"message": "Ошибка. Некорректный токен!"}
+        filtered_emails_out = [item for item in emails_out if interlocutor in item['recipient']]
+        senders_2 = get_senders(filtered_emails_out, 'subject')
+    else:
+        emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox')
+        if emails_in == 'Error': return {"message": "Ошибка. Некорректный токен!"}
+        filtered_emails_in = [item for item in emails_in if interlocutor in item['sender']]
+        senders_1 = get_senders(filtered_emails_in, 'subject')
+        emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent')
+        if emails_out == 'Error': return {"message": "Ошибка. Некорректный токен!"}
+        filtered_emails_out = [item for item in emails_out if interlocutor in item['recipient']]
+        senders_2 = get_senders(filtered_emails_out, 'subject')
     combined_data = senders_1 + senders_2
     list_of_themes = []
     for theme in combined_data:
@@ -560,16 +632,28 @@ async def get_messages_in_themes_of_chats(interlocutor: str, theme: str, current
     def parse_received_time(received_time):
         return datetime.strptime(received_time, "%H:%M %d.%m.%Y")
     decoded_password = decrypt_password(current_user.password)
-    emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox')
-    if emails_in == 'Error': return {"message": "Ошибка. Некорректный токен!"}
-    filtered_emails_in = [
-        item for item in emails_in if interlocutor in item['sender'] and (theme == item['subject'] or theme == item['subject'][4:])
-    ]
-    emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent')
-    if emails_out == 'Error': return {"message": "Ошибка. Некорректный токен!"}
-    filtered_emails_out = [
-        item for item in emails_out if interlocutor in item['recipient'] and (theme == item['subject'] or theme == item['subject'][4:])
-    ]
+    if current_user.mail.split('@')[1] != "pmc-python.ru":
+        emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox', imap_server = 'imap.mail.ru')
+        if emails_in == 'Error': return {"message": "Ошибка. Некорректный токен!"}
+        filtered_emails_in = [
+            item for item in emails_in if interlocutor in item['sender'] and (theme == item['subject'] or theme == item['subject'][4:])
+        ]
+        emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent', imap_server = 'imap.mail.ru')
+        if emails_out == 'Error': return {"message": "Ошибка. Некорректный токен!"}
+        filtered_emails_out = [
+            item for item in emails_out if interlocutor in item['recipient'] and (theme == item['subject'] or theme == item['subject'][4:])
+        ]
+    else:
+        emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox')
+        if emails_in == 'Error': return {"message": "Ошибка. Некорректный токен!"}
+        filtered_emails_in = [
+            item for item in emails_in if interlocutor in item['sender'] and (theme == item['subject'] or theme == item['subject'][4:])
+        ]
+        emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent')
+        if emails_out == 'Error': return {"message": "Ошибка. Некорректный токен!"}
+        filtered_emails_out = [
+            item for item in emails_out if interlocutor in item['recipient'] and (theme == item['subject'] or theme == item['subject'][4:])
+        ]
     combined_data = filtered_emails_in + filtered_emails_out
     unique_emails_list = []
     for email in combined_data:
@@ -592,13 +676,15 @@ async def get_messages_in_themes_of_chats(interlocutor: str, theme: str, current
 @app.get("/attachments/{folder}/{mail_id}/{file_name}", tags=["Chat"])
 async def get_attachment(folder: str, mail_id: str, file_name: str, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
     decoded_password = decrypt_password(current_user.password)
-    file_path, content_type = fetch_email_attachment(current_user.mail, decoded_password, mail_id, file_name, folder)
+    if current_user.mail.split('@')[1] != "pmc-python.ru":
+        file_path, content_type = fetch_email_attachment(current_user.mail, decoded_password, mail_id, file_name, folder, imap_server = 'imap.mail.ru')
+    else:
+        file_path, content_type = fetch_email_attachment(current_user.mail, decoded_password, mail_id, file_name, folder)
     if file_path == 'Error': return {"message": "Ошибка. Некорректный токен!"}
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Файл не найден!")
     background_tasks.add_task(delete_file, file_path)
     return FileResponse(file_path, media_type=content_type, filename=file_name)
-
 
 
 uvicorn.run(app, host=run_host, port=run_port)
