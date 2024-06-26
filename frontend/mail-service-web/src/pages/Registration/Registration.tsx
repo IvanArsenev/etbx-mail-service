@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import styles from './Registration.module.scss';
+import { registerUser, UserData } from '../../api/RegistrationApi';
+import { checkAuth } from '../../utils';
 
-const Login: React.FC = () => {
-    const [ isAuth, setIsAuth ] = useState<boolean>(false);
+const Registration: React.FC = () => {
+    const navigate = useNavigate();
+
     const [passwordStrength, setPasswordStrength] = useState<number>(0);
     const [colorLoad, setLoaderColor] = useState<string>('rgb(255, 0, 0)');
     const [mainPassword, setMainPassword] = useState<string>('');
@@ -12,6 +15,15 @@ const Login: React.FC = () => {
     const [passwordError, setPasswordError] = useState<string>('none');
     const [copyPassword, setCopyPassword] = useState<string>('');
     const [passwordsAreSame, setSamenest] = useState<string>('none');
+    const [birthdayIsCorrect, setBirthdayIsCorrect] = useState<boolean>(false);
+    const [allFieldsFilled, setAllFieldsFilled] = useState<boolean>(false);
+
+    const [name, setName] = useState<string>('');
+    const [surname, setSurname] = useState<string>('');
+    const [email, setEmail] = useState<string>('');
+    const [birthday, setBirthday] = useState<string>(Date());
+    const [gender, setGender] = useState<string>('М');
+    const [phone, setPhone] = useState<string>('+7');
 
     const baseSymbols = 'qwertyuiopasdfghjklzxcvbnm';
     const bigSymbols = 'QWERTYUIOPASDFGHJKLZXCVBNM';
@@ -19,6 +31,17 @@ const Login: React.FC = () => {
     const russianBigSymbols = 'ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮЁ';
     const extraSymbols = '`~1234567890-=!@#$%^&*()_+"№;%:?[]{},.<>/|\\ ';
     const totalSymbols = baseSymbols + bigSymbols + russianSymbols + russianBigSymbols + extraSymbols;
+
+    useEffect(() => {
+        const verifyAuth = async () => {
+          const user = await checkAuth();
+          if (user?.message !== 'Войдите в систему!') {
+            navigate('/users');
+          }
+        };
+    
+        verifyAuth();
+    }, [navigate]);
 
     useEffect(() => {
         if (mainPassword === copyPassword) {
@@ -33,6 +56,16 @@ const Login: React.FC = () => {
     }, [mainPassword, copyPassword]);
 
     useEffect(() => {
+        console.log(new Date(birthday) >= new Date('01.01.1910'), new Date(birthday) < new Date());
+        if (new Date(birthday) >= new Date('01.01.1910') && new Date(birthday) < new Date()) {
+            setBirthdayIsCorrect(true);
+        }
+        else {
+            setBirthdayIsCorrect(false);
+        }
+    }, [birthday])
+
+    useEffect(() => {
         if (!passwordIsValid) {
             setPasswordError('inline-block');
         }
@@ -41,8 +74,61 @@ const Login: React.FC = () => {
         }
     }, [passwordIsValid]);
 
-    if (isAuth) {
-        return <Navigate to="/" />;
+    useEffect(() => {
+        setAllFieldsFilled(name && surname && email && birthday && gender && mainPassword);
+    }, [name, surname, email, birthday, gender, mainPassword]);
+
+    const handleSend = () => {
+        const dataBody: UserData = {
+            name: name,
+            surname: surname,
+            birthday: formatDate(birthday),
+            gender: gender,
+            mail: email,
+            phone_num: formatPhone(phone),
+            password: mainPassword,
+        }
+        const responce = registerUser(dataBody);
+        if (responce !== null) {
+            navigate('/users');
+        }
+    }
+
+    const setBasePhone = (target, phone_value: string) => {
+        const pattern = ['+', '7', ' ', '(', '0123456789', '0123456789', '0123456789', ')', ' ', '0123456789', '0123456789', '0123456789', ' ', '0123456789', '0123456789', '-', '0123456789', '0123456789'];
+
+        let new_phone = '';
+        let k = 0;
+        for (let i = 0; i < Math.min(phone_value.length, pattern.length); i++) {
+            const letter = phone_value[i];
+            if (!pattern[k].includes(letter)) {
+                new_phone += pattern[k][0];
+                k += 1;
+                if (k < pattern.length) {
+                    let ok = false;
+                    if (!pattern[k].includes(letter)) {
+                        new_phone += pattern[k][0];
+                    }
+                    else {
+                        new_phone += letter;
+                        ok = true;
+                    }
+                    k += 1;
+                    if (k < pattern.length && !ok) {
+                        if (pattern[k].includes(letter)) {
+                            new_phone += letter;
+                        }
+                    }
+                }
+            }
+            else {
+                new_phone += phone_value[i];
+            }
+            k += 1;
+        }
+
+        target.value = new_phone;
+        setPhone(new_phone);
     }
 
     const passwordSecond = (password:string) => {
@@ -117,15 +203,75 @@ const Login: React.FC = () => {
         setPasswordStrength(strength);
     }
 
+    const formatDate = (date:string): string => {
+        const year = date.split('-')[0];
+        const month = date.split('-')[1];
+        const day = date.split('-')[2];
+        return `${day}-${month}-${year}`;
+    }
+
+    const formatPhone = (phone:string): string => {
+        const newPhone = phone.replace('+', '').replace(' ', '').replace('(', '').replace(')', '').replace('-', '');
+        return newPhone;
+    }
+
     return (
         <div className={styles.container}>
             <div className={styles.wall}>
                 <div className={styles.mainBlock}>
                     <div className={styles.block}>
                         <div className={`${styles.label}`}>
+                            Имя
+                        </div>
+                        <input placeholder='Введите имя' type="text" className={`${styles.inputLike}`}
+                        onChange={(e) => setName(e.target.value)} />
+                    </div>
+                    <div className={styles.block}>
+                        <div className={`${styles.label}`}>
+                            Фамилия
+                        </div>
+                        <input placeholder='Введите фамилию' type="text" className={`${styles.inputLike}`}
+                        onChange={(e) => setSurname(e.target.value)} />
+                    </div>
+                    <div className={styles.block}>
+                        <div className={`${styles.label}`}>
+                            Дата рождения
+                        </div>
+                        <input type="date" className={`${styles.inputLike}`}
+                        onChange={(e) => setBirthday(e.target.value)} />
+                        <div style={{display: birthdayIsCorrect ? 'none' : ''}} className={`${styles.error}`}>
+                            Дата рождения не может быть в будущем. Дата рождения должна быть не раньше 1 января 1910 года.
+                        </div>
+                    </div>
+                    <div className={styles.block}>
+                        <div className={`${styles.label}`}>
+                            Пол
+                        </div>
+                        <div>
+                            <input type="radio" name="gender" value="male" className={`${styles.inputRadioLike}`}
+                            onChange={(e) => setGender(e.target.value)} /> Мужской
+                        </div>
+                        <div>
+                            <input type="radio" name="gender" value="female" className={`${styles.inputRadioLike}`}
+                            onChange={(e) => setGender(e.target.value)} /> Женский
+                        </div>
+                    </div>
+                    <div className={styles.block}>
+                        <div className={`${styles.label}`}>
                             Электронная почта
                         </div>
-                        <input placeholder='myemail@example.etb' type="text" className={`${styles.inputLike}`} />
+                        <input placeholder='myemail' type="text" className={`${styles.inputLike}`}
+                        onChange={(e) => setEmail(e.target.value)} />
+                        <div style={{display: 'none'}} className={`${styles.error}`}>
+                            Кажется, введён некорректный e-mail
+                        </div>
+                    </div>
+                    <div className={styles.block}>
+                        <div className={`${styles.label}`}>
+                            Номер телефона
+                        </div>
+                        <input placeholder='+7 (900) 850 34-44' type="phone" className={`${styles.inputLike}`}
+                        onChange={(e) => setBasePhone(e.target, e.target.value)} />
                         <div style={{display: 'none'}} className={`${styles.error}`}>
                             Кажется, введён некорректный e-mail
                         </div>
@@ -154,7 +300,7 @@ const Login: React.FC = () => {
                             Пароли не совпадают
                         </div>
                     </div>
-                    <div id='submitButton' className={`${styles.submitButton} ${styles.buttonInactive}`}>
+                    <div id='submitButton' className={`${styles.submitButton} ${allFieldsFilled && passwordIsValid && birthdayIsCorrect && passwordsAreSame && email ? '' : styles.buttonInactive}`} onClick={handleSend}>
                         Зарегистрироваться
                     </div>
                 </div>
@@ -162,4 +308,4 @@ const Login: React.FC = () => {
         </div>
     );
 };
-export default Login;
+export default Registration;

@@ -1,30 +1,51 @@
-import React, { useState } from 'react';
-import { Navigate, useParams } from 'react-router-dom';
-
-import UserAuth, { themes } from './constants.ts';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import styles from './Chats.module.scss';
+import { GetThemes } from '../../api/ThemesApi/index.ts';
+import Chat from '../Chat/Chat.tsx';
+
+const Spinner = React.lazy(async () => await import('../Spinner/Spinner'));
 
 const Chats: React.FC = () => {
-    const [ isAuth, setIsAuth ] = useState<boolean>(false);
+    const [getStatus, setGetStatus] = useState<boolean>(false);
+    const [chatsResp, setChatsResp] = useState<string[]>([]);
+
+    const [theme, setTheme] = useState<string | null>(null);
 
     const { id } = useParams<{ id: string }>();
 
-    if (themes.length <= parseInt(id ?? '0')) {
-        return <Navigate to="/users" />;
-    }
+    const navigate = useNavigate();
 
-    if (isAuth) {
-        return <Navigate to="/" />;
-    }
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                if (id) {
+                    const fetched = await GetThemes(id ?? '');
+                    
+                    setChatsResp(fetched?.themes ?? []);
+                    setGetStatus(true);
 
-    const onFinish = ({ username, password }: UserAuth): void => {
-        if (!isAuth) {
-        }
-    };
+                    localStorage.setItem('mailUserId', id);
+                }
+                else {
+                    navigate('/users')
+                }
+            } catch (error) {
+                setGetStatus(true);
+                console.error('Error fetching:', error);
+            }
+        };
+
+        fetchUsers();
+    }, [id]);
 
     const handleChoose = (event): void => {
         const themeBlocks = document.querySelectorAll(`.${styles.themeBlock}`);
+
+        // localStorage.setItem('mailChoosedTheme', event.currentTarget.id.split('_')[1]);
+        console.log(event.currentTarget.id.split('_')[1]);
+        setTheme(chatsResp[parseInt(event.currentTarget.id.split('_')[1])]);
 
         // Удаление класса choosed у всех элементов
         themeBlocks.forEach((block) => {
@@ -60,26 +81,29 @@ const Chats: React.FC = () => {
     };
 
     return (
+        <>
         <div className={styles.wall}>
-            {themes[parseInt(id ?? '0')].map((theme, index) => (
-                <div style={{zIndex: themes.length - theme.id}} id={`theme_${theme.id}`} onClick={ (e) => handleChoose(e) } className={`${styles.themeBlock}`}>
-                    <div id={`theme_${theme.id}_click`} className={styles.click}></div>
+            {chatsResp.map((theme, index) => (
+                <div style={{zIndex: chatsResp.length - index}} id={`theme_${index}`} onClick={ (e) => handleChoose(e) } className={`${styles.themeBlock}`}>
+                    <div id={`theme_${index}_click`} className={styles.click}></div>
                     <img src="" alt="" className={styles.themeAvatar} />
                     <div className={styles.themeTop}>
                         <div className={styles.themeName}>
-                            {theme.name}
+                            {theme}
                         </div>
-                        <div className={styles.themeLastDate}>
+                        {/* <div className={styles.themeLastDate}>
                             {theme.lastMessageDate}
                         </div>
                         <div className={styles.themeLastTheme}>
                             {theme.lastMail}
-                        </div>
+                        </div> */}
                     </div>
                 </div>
             ))}
-            
+            <Spinner display={!getStatus} />
         </div>
+        <Chat userId={id ?? null} theme={theme ?? null}/>
+        </>
     );
 };
 export default Chats;

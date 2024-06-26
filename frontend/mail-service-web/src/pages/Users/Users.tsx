@@ -1,23 +1,44 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 
-import UserAuth, { users } from './constants.ts';
+import { UserObject, UserResponce } from './constants';
 
 import styles from './Users.module.scss';
+import { GetAvatar, UsersAll } from '../../api/UserApi';
+import Spinner from '../Spinner/Spinner';
 
 const Users: React.FC = () => {
-    const [ isAuth, setIsAuth ] = useState<boolean>(false);
+    const [getStatus, setGetStatus] = useState<boolean>(false);
+    const [usersResp, setUsersResp] = useState<UserResponce>({ total_users: 0, users: [] });
+    const [usersAvatars, setUsersAvatars] = useState<any[]>([]);
 
-    if (isAuth) {
-        return <Navigate to="/" />;
-    }
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                const fetchedUsers = await UsersAll();
+                await setUsersResp(fetchedUsers);
+                await setGetStatus(true);
+                // чего
+                // let newAvs:any[] = [];
+                // for (let i = 0; i < fetchedUsers.total_users; i++) {
+                //     if (fetchedUsers.users[i].Аватар !== null) {
+                //         newAvs.push(await GetAvatar(fetchedUsers.users[i].Аватар))
+                //     }
+                //     else {
+                //         newAvs.push('');
+                //     }
+                // }
+                // setUsersAvatars(newAvs);
+            } catch (error) {
+                setGetStatus(true);
+                console.error('Error fetching users:', error);
+            }
+        };
 
-    const onFinish = ({ username, password }: UserAuth): void => {
-        if (!isAuth) {
-        }
-    };
-
-    const handleChoose = (event, id: number) => {
+        fetchUsers();
+    }, []);
+    
+    const handleChoose = (event: any, id: number) => {
         const userBlocks = document.querySelectorAll(`.${styles.userBlock}`);
 
         // Удаление класса choosed у всех элементов
@@ -59,23 +80,29 @@ const Users: React.FC = () => {
     return (
         <>
             <div className={styles.wall}>
-                {users.map((user, index) => (
-                    <div style={{zIndex: users.length - index}} id={`user_${user.id}`} onClick={ (e) => handleChoose(e, index) } className={`${styles.userBlock}`}>
+                {usersResp.users.map((user: UserObject, index: number) => (
+                    <div 
+                        style={{zIndex: usersResp.total_users - index}}
+                        id={`user_${user.id}`}
+                        onClick={ (e) => handleChoose(e, user.id) }
+                        className={`${styles.userBlock}`}
+                    >
                         <img src="" alt="" className={styles.userAvatar} />
                         <div className={styles.userTop}>
                             <div className={styles.userName}>
-                                {user.username}
+                                {user.Фамилия} {user.Имя}
                             </div>
                             <div className={styles.userLastDate}>
-                                {user.lastDate}
+                                {user.Почта}
                             </div>
-                            <div className={styles.userLastTheme}>
+                            {/* <div className={styles.userLastTheme}>
                                 {user.lastTheme}
-                            </div>
+                            </div> */}
                         </div>
                         <div style={{zIndex: -100}} id={`user_${user.id}_click`} className={styles.click}></div>
                     </div>
                 ))}
+                <Spinner display={!getStatus} />
             </div>
         </>
     );
