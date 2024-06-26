@@ -217,7 +217,7 @@ def get_senders(combined_data, f_name):
 
 
 
-@app.get("/users/me")
+@app.get("/users/me", tags=["Profile"])
 async def read_users_me(current_user: User = Depends(get_current_user)):
     if check_available_token(current_user.token):
         return {"message": "Войдите в систему!"}
@@ -234,7 +234,7 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
     }
     return user
 
-@app.get("/users/{id}")
+@app.get("/users/{id}", tags=["Users"])
 async def read_user_id(id: str):
     user_db = SessionLocal().query(User).filter(User.id == id).first()
     if user_db is None:
@@ -255,7 +255,7 @@ async def read_user_id(id: str):
     }
     return user
 
-@app.get("/users", response_model=PaginatedUsersResponse)
+@app.get("/users", tags=["Users"], response_model=PaginatedUsersResponse)
 async def get_users(page: int = Query(1, ge=1), page_size: int = Query(10, ge=1)):
     db = SessionLocal()
     total_users = db.query(User).count()
@@ -278,7 +278,7 @@ async def get_users(page: int = Query(1, ge=1), page_size: int = Query(10, ge=1)
         "users": formatted_users
     }
 
-@app.post("/register")
+@app.post("/register", tags=["Auth"])
 async def register_user(registration_request: RegistrationRequest):
     db = SessionLocal()
     existing_user = db.query(User).filter(User.mail == f'{registration_request.mail}@pmc-python.ru').first()
@@ -319,7 +319,7 @@ async def register_user(registration_request: RegistrationRequest):
     db.close()
     return {"Token": new_user.token}
 
-@app.post("/login")
+@app.post("/login", tags=["Auth"])
 async def login_for_access_token(form_data: LoginRequest):
     user = get_user_by_email(form_data.email)
     if not user:
@@ -345,11 +345,11 @@ async def login_for_access_token(form_data: LoginRequest):
     db.close()
     return {"Token": user.token}
 
-@app.get("/avatars/{image_name}")
+@app.get("/avatars/{image_name}", tags=["Users"])
 async def get_image(image_name: str):
     return {"message": f"Requesting image: {image_name}"}
 
-@app.put("/edit_avatar")
+@app.put("/edit_avatar", tags=["Profile"])
 async def edit_avatar(avatar: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     if check_available_token(current_user.token):
         return {"message": "Войдите в систему!"}
@@ -388,7 +388,7 @@ async def edit_avatar(avatar: UploadFile = File(...), current_user: dict = Depen
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при обработке файла: {str(e)}")
 
-@app.delete("/remove_avatar")
+@app.delete("/remove_avatar", tags=["Profile"])
 async def remove_avatar(current_user: dict = Depends(get_current_user)):
     if check_available_token(current_user.token):
         return {"message": "Войдите в систему!"}
@@ -407,7 +407,7 @@ async def remove_avatar(current_user: dict = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при удалении аватара: {str(e)}")
 
-@app.put("/edit")
+@app.put("/edit", tags=["Profile"])
 async def edit_me(updated_profile: EditProfile, current_user: dict = Depends(get_current_user)):
     if check_available_token(current_user.token):
         return {"message": "Войдите в систему!"}
@@ -446,7 +446,7 @@ async def edit_me(updated_profile: EditProfile, current_user: dict = Depends(get
     except:
         raise HTTPException(status_code=500, detail="Ошибка при обновлении профиля")
 
-@app.post("/logout")
+@app.post("/logout", tags=["Auth"])
 async def logout(current_user: dict = Depends(get_current_user)):
     if check_available_token(current_user.token):
         return {"message": "Вы не в системе!"}
@@ -457,7 +457,7 @@ async def logout(current_user: dict = Depends(get_current_user)):
     db.close()
     return {"message": "Вы успешно вышли из системы"}
 
-@app.get("/messages/{folder}")
+@app.get("/messages/{folder}", tags=["Chat"])
 async def get_messages(folder: str, current_user: dict = Depends(get_current_user)):
     if check_available_token(current_user.token):
         return {"message": "Войдите в систему!"}
@@ -481,7 +481,7 @@ async def get_messages(folder: str, current_user: dict = Depends(get_current_use
     ]
     return {"messages": formatted_emails}
 
-@app.post("/send")
+@app.post("/send", tags=["Chat"])
 async def send_msg(message: Message, current_user: dict = Depends(get_current_user)):
     if check_available_token(current_user.token):
         return {"message": "Вы не в системе!"}
@@ -492,7 +492,7 @@ async def send_msg(message: Message, current_user: dict = Depends(get_current_us
     else:
         return {"message": "Ошибка"}
 
-@app.get("/get_my_chats")
+@app.get("/get_my_chats", tags=["Chat"])
 async def get_users_chats(current_user: dict = Depends(get_current_user)):
     decoded_password = decrypt_password(current_user.password)
     emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox')
@@ -508,7 +508,7 @@ async def get_users_chats(current_user: dict = Depends(get_current_user)):
     unique_emails_list = list(unique_emails)
     return {"chats": unique_emails_list}
     
-@app.get("/get_themes_of_chat/{interlocutor}")
+@app.get("/get_themes_of_chat/{interlocutor}", tags=["Chat"])
 async def get_themes_of_chats(interlocutor: str, current_user: dict = Depends(get_current_user)):
     decoded_password = decrypt_password(current_user.password)
     emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox')
@@ -530,8 +530,8 @@ async def get_themes_of_chats(interlocutor: str, current_user: dict = Depends(ge
     unique_emails_list = list(set(list_of_themes))
     return {"themes": unique_emails_list}
 
-@app.get("/get_messages_by_theme/{interlocutor}/{theme}")
-async def get_themes_of_chats(interlocutor: str, theme: str, current_user: dict = Depends(get_current_user)):
+@app.get("/get_messages_by_theme/{interlocutor}/{theme}", tags=["Chat"])
+async def get_messages_in_themes_of_chats(interlocutor: str, theme: str, current_user: dict = Depends(get_current_user)):
     def clean_email_address(email):
         match = re.search(r'[\w\.-]+@[\w\.-]+', email)
         return match.group(0) if match else email
@@ -567,7 +567,7 @@ async def get_themes_of_chats(interlocutor: str, theme: str, current_user: dict 
         del email["parsed_received_time"]
     return {"messages": unique_emails_list}
 
-@app.get("/attachments/{folder}/{mail_id}/{file_name}")
+@app.get("/attachments/{folder}/{mail_id}/{file_name}", tags=["Chat"])
 async def get_attachment(folder: str, mail_id: str, file_name: str, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
     decoded_password = decrypt_password(current_user.password)
     file_path, content_type = fetch_email_attachment(current_user.mail, decoded_password, mail_id, file_name, folder)
