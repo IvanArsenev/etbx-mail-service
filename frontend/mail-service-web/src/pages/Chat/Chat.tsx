@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import styles from './Chat.module.scss';
 import { GetMessages } from '../../api/MessagesApi/index.ts';
@@ -17,20 +17,21 @@ const CreateMessage = React.lazy(async () => await import('../../pages/CreateMes
 
 const Users: React.FC<IProps> = (items: IProps) => {
   const [getStatus, setGetStatus] = useState<boolean>(false);
-  const [chatResp, setChatResp] = useState<Message[]>([]);
+  const [chatResp, setChatResp] = useState<{messages: Message[]}>({messages: []});
 
   const [user, setUser] = useState<UserObject | null>(null);
 
   const navigate = useNavigate();
 
   useEffect(() => {
+    setGetStatus(false);
+    setChatResp({messages: []});
     const fetchUsers = async () => {
         try {
           if (localStorage.getItem('mailChoosedTheme')) {
             const fetched = await GetMessages(items.userId ?? '', items.theme ?? '');
               
-            setChatResp(fetched ?? []);
-            console.log('messages', fetched);
+            setChatResp(fetched ?? {messages: []});
             setGetStatus(true);
           }
         } catch (error) {
@@ -56,22 +57,22 @@ const Users: React.FC<IProps> = (items: IProps) => {
       <div className={styles.chat}>
         <Spinner display={!getStatus} />
         {
-          chatResp.slice(0).reverse().map((message, index) => {
+          chatResp.messages.slice(0).reverse().map((message, index) => {
             let prevUserId: string | null = null;
             let nextUserId: string | null = null;
 
-            if (chatResp.length - index - 1 + 1 < chatResp.length) {
-              nextUserId = chatResp[chatResp.length - index - 1 + 1].sender;
+            if (chatResp.messages.length - index - 1 + 1 < chatResp.messages.length) {
+              nextUserId = chatResp.messages[chatResp.messages.length - index - 1 + 1].sender;
             }
-            if (chatResp.length - index - 1 - 1 >= 0) {
-              prevUserId = chatResp[chatResp.length - index - 1 - 1].sender;
+            if (chatResp.messages.length - index - 1 - 1 >= 0) {
+              prevUserId = chatResp.messages[chatResp.messages.length - index - 1 - 1].sender;
             }
 
             const isFirst = message.sender !== prevUserId;
             const isLast = message.sender !== nextUserId;
             
             return (
-              <div className={`${styles.messageBlock} ${user?.Почта === message.sender ? styles.myMessageBlock : ''}`}>
+              <div style={{display: message.subject === items.theme ? '' : 'none'}} className={`${styles.messageBlock} ${user?.Почта === message.sender ? styles.myMessageBlock : ''}`}>
                 <div className={styles.avatarBlock}>
                   {isLast ? <img src="" alt="" className={styles.userAvatar} /> : <></>}
                 </div>

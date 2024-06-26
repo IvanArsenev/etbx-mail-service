@@ -4,8 +4,8 @@ import { Navigate } from 'react-router-dom';
 import { UserObject, UserResponce } from './constants';
 
 import styles from './Users.module.scss';
-import { GetAvatar, UsersAll } from '../../api/UserApi';
-import Spinner from '../Spinner/Spinner';
+import { GetAvatar, UsersAll } from '../../api/UserApi/index.ts';
+import Spinner from '../Spinner/Spinner.tsx';
 
 const Users: React.FC = () => {
     const [getStatus, setGetStatus] = useState<boolean>(false);

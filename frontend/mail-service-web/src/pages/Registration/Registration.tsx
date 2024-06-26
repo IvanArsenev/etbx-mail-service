@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import styles from './Registration.module.scss';
-import { registerUser, UserData } from '../../api/RegistrationApi';
-import { checkAuth } from '../../utils';
+import { registerUser, UserData } from '../../api/RegistrationApi/index.ts';
+import { checkAuth } from '../../utils.ts';
 
 const Registration: React.FC = () => {
     const navigate = useNavigate();

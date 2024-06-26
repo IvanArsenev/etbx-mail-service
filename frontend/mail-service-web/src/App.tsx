@@ -8,12 +8,12 @@ import { Navigate, type RouteObject, useRoutes } from 'react-router-dom';
 
 import './App.css'
 
-const SideBar = React.lazy(async () => await import('./pages/SideBar/SideBar'));
-const Chat = React.lazy(async () => await import('./pages/Chat/Chat'));
-const Users = React.lazy(async () => await import('./pages/Users/Users'));
-const Chats = React.lazy(async () => await import('./pages/Chats/Chats'));
-const Registration = React.lazy(async () => await import('./pages/Registration/Registration'));
-const Login = React.lazy(async () => await import('./pages/Login/Login'));
+const SideBar = React.lazy(async () => await import('./pages/SideBar/SideBar.tsx'));
+const Chat = React.lazy(async () => await import('./pages/Chat/Chat.tsx'));
+const Users = React.lazy(async () => await import('./pages/Users/Users.tsx'));
+const Chats = React.lazy(async () => await import('./pages/Chats/Chats.tsx'));
+const Registration = React.lazy(async () => await import('./pages/Registration/Registration.tsx'));
+const Login = React.lazy(async () => await import('./pages/Login/Login.tsx'));
 
 const createRoutes = (): RouteObject[] => [
   {

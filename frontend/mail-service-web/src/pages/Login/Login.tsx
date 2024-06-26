@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import styles from './Login.module.scss';
-import { checkAuth } from '../../utils';
-import { UserLogData, loginUser } from '../../api/LoginApi';
+import { checkAuth } from '../../utils.ts';
+import { UserLogData, loginUser } from '../../api/LoginApi/index.ts';
 
 const Login: React.FC = () => {
     const navigate = useNavigate();

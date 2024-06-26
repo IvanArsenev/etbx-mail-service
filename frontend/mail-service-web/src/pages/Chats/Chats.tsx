@@ -5,7 +5,7 @@ import styles from './Chats.module.scss';
 import { GetThemes } from '../../api/ThemesApi/index.ts';
 import Chat from '../Chat/Chat.tsx';
 
-const Spinner = React.lazy(async () => await import('../Spinner/Spinner'));
+const Spinner = React.lazy(async () => await import('../Spinner/Spinner.tsx'));
 
 const Chats: React.FC = () => {
     const [getStatus, setGetStatus] = useState<boolean>(false);

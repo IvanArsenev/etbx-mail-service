@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import styles from './SideBar.module.scss';
-import { Logout } from '../../api/UserApi';
-import { checkAuth } from '../../utils';
+import { Logout } from '../../api/UserApi/index.ts';
+import { checkAuth } from '../../utils.ts';
 
 const SideBar: React.FC = () => {
     const navigate = useNavigate();
