@@ -39,7 +39,10 @@ def delete_file(file_path: str):
 
 def fetch_email_attachment(email_user, app_password, mail_id, filename, folder="All Mail", imap_server="mail.pmc-python.ru", save_path="files"):
     mail = imaplib.IMAP4_SSL(imap_server, 993)
-    mail.login(email_user, app_password)
+    try:
+        mail.login(email_user, app_password)
+    except:
+        return 'Error', ''
     mail.select(folder)
     status, messages = mail.search(None, 'ALL')
     mail_ids = messages[0].split()
@@ -112,7 +115,10 @@ def check_available_token(token):
 
 def login_and_fetch_emails(email_user, app_password, folder="All Mail", unseen='ALL', imap_server="mail.pmc-python.ru"):
     mail = imaplib.IMAP4_SSL(imap_server, 993)
-    mail.login(email_user, app_password)
+    try:
+        mail.login(email_user, app_password)
+    except:
+        return 'Error'
     status, folders = mail.list()
     mail.select(folder)
     status, messages = mail.search(None, unseen)
@@ -211,8 +217,8 @@ def send_email(email_user, email_password, to_address, subject, message, smtp_se
         return True
     except Exception as e:
         return False
-    finally:
-        server.quit()
+    # finally:
+    #     server.quit()
 
 def parse_datetime(datetime_str):
     return datetime.strptime(datetime_str, "%H:%M %d.%m.%Y")
@@ -500,14 +506,16 @@ async def send_msg(message: Message, current_user: dict = Depends(get_current_us
     if check:
         return {"message": "Сообщение отправлено"}
     else:
-        return {"message": "Ошибка"}
+        return {"message": "Ошибка. Некорректный токен!"}
 
 @app.get("/get_my_chats", tags=["Chat"])
 async def get_users_chats(current_user: dict = Depends(get_current_user)):
     decoded_password = decrypt_password(current_user.password)
     emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox')
+    if emails_in == 'Error': return {"message": "Ошибка. Некорректный токен!"}
     senders_1 = get_senders(emails_in, 'sender')
     emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent')
+    if emails_out == 'Error': return {"message": "Ошибка. Некорректный токен!"}
     senders_2 = get_senders(emails_out, 'recipient')
     combined_data = senders_1 + senders_2
     email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
@@ -522,9 +530,11 @@ async def get_users_chats(current_user: dict = Depends(get_current_user)):
 async def get_themes_of_chats(interlocutor: str, current_user: dict = Depends(get_current_user)):
     decoded_password = decrypt_password(current_user.password)
     emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox')
+    if emails_in == 'Error': return {"message": "Ошибка. Некорректный токен!"}
     filtered_emails_in = [item for item in emails_in if interlocutor in item['sender']]
     senders_1 = get_senders(filtered_emails_in, 'subject')
     emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent')
+    if emails_out == 'Error': return {"message": "Ошибка. Некорректный токен!"}
     filtered_emails_out = [item for item in emails_out if interlocutor in item['recipient']]
     senders_2 = get_senders(filtered_emails_out, 'subject')
     combined_data = senders_1 + senders_2
@@ -551,10 +561,12 @@ async def get_messages_in_themes_of_chats(interlocutor: str, theme: str, current
         return datetime.strptime(received_time, "%H:%M %d.%m.%Y")
     decoded_password = decrypt_password(current_user.password)
     emails_in = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'inbox')
+    if emails_in == 'Error': return {"message": "Ошибка. Некорректный токен!"}
     filtered_emails_in = [
         item for item in emails_in if interlocutor in item['sender'] and (theme == item['subject'] or theme == item['subject'][4:])
     ]
     emails_out = login_and_fetch_emails(f'{current_user.mail}', decoded_password, 'Sent')
+    if emails_out == 'Error': return {"message": "Ошибка. Некорректный токен!"}
     filtered_emails_out = [
         item for item in emails_out if interlocutor in item['recipient'] and (theme == item['subject'] or theme == item['subject'][4:])
     ]
@@ -581,6 +593,7 @@ async def get_messages_in_themes_of_chats(interlocutor: str, theme: str, current
 async def get_attachment(folder: str, mail_id: str, file_name: str, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
     decoded_password = decrypt_password(current_user.password)
     file_path, content_type = fetch_email_attachment(current_user.mail, decoded_password, mail_id, file_name, folder)
+    if file_path == 'Error': return {"message": "Ошибка. Некорректный токен!"}
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Файл не найден!")
     background_tasks.add_task(delete_file, file_path)
