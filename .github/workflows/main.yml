@@ -18,7 +18,7 @@ jobs:
     - name: Set up Docker
       run: |
         mkdir -p $HOME/.semgrep
-        cp rules.yaml $HOME/.semgrep/rules.yaml
+        cp $GITHUB_WORKSPACE/rules.yaml $HOME/.semgrep/rules.yaml
 
     - name: Run Semgrep security scan
       uses: addnab/docker-run-action@v3
