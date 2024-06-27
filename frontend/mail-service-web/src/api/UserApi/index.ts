@@ -27,7 +27,7 @@ export async function UserMe(): Promise<any> {
     }
 
     const result = await response.json();
-    
+
     return result;
   } catch (error) {
     return null;
@@ -65,7 +65,7 @@ export async function Logout(): Promise<any> {
 }
 
 export async function UsersAll(): Promise<any> {
-  const url = 'http://etbx.ru:7070/users?page=1&page_size=100000';
+  const url = 'http://etbx.ru:7070/get_my_chats';
   try {
     const token = localStorage.getItem('mailServiceToken');
     const response = await fetch(url, {

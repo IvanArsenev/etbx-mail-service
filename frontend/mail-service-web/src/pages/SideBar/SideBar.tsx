@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import styles from './SideBar.module.scss';
@@ -11,7 +11,8 @@ const SideBar: React.FC = () => {
     useEffect(() => {
         const verifyAuth = async () => {
           const user = await checkAuth();
-          if (user?.message === 'Войдите в систему!') {
+          console.log(user);
+          if (user?.message === 'Войдите в систему!' || user === null) {
             navigate('/');
           }
         };

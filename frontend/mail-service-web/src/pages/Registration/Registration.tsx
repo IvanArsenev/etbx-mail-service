@@ -35,7 +35,7 @@ const Registration: React.FC = () => {
     useEffect(() => {
         const verifyAuth = async () => {
           const user = await checkAuth();
-          if (user?.message !== 'Войдите в систему!') {
+          if (user?.message !== 'Войдите в систему!' && user !== null) {
             navigate('/users');
           }
         };
@@ -300,8 +300,13 @@ const Registration: React.FC = () => {
                             Пароли не совпадают
                         </div>
                     </div>
-                    <div id='submitButton' className={`${styles.submitButton} ${allFieldsFilled && passwordIsValid && birthdayIsCorrect && passwordsAreSame && email ? '' : styles.buttonInactive}`} onClick={handleSend}>
-                        Зарегистрироваться
+                    <div style={{display: 'flex', flexDirection: 'row', width: '100%'}}>
+                        <div id='submitButton' className={`${styles.submitButton}`} onClick={handleSend}>
+                            Зарегистрироваться
+                        </div>
+                        <div id='loginGo' className={`${styles.submitButton} ${styles.buttonInactive}`} onClick={() => { navigate('/login') }}>
+                            Войти
+                        </div>
                     </div>
                 </div>
             </div>

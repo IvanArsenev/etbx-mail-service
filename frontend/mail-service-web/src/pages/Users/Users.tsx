@@ -9,7 +9,7 @@ import Spinner from '../Spinner/Spinner.tsx';
 
 const Users: React.FC = () => {
     const [getStatus, setGetStatus] = useState<boolean>(false);
-    const [usersResp, setUsersResp] = useState<UserResponce>({ total_users: 0, users: [] });
+    const [usersResp, setUsersResp] = useState<{ chats: string[] }>({ chats: [] });
     const [usersAvatars, setUsersAvatars] = useState<any[]>([]);
 
     useEffect(() => {
@@ -38,7 +38,7 @@ const Users: React.FC = () => {
         fetchUsers();
     }, []);
     
-    const handleChoose = (event: any, id: number) => {
+    const handleChoose = (event: any, id: string) => {
         const userBlocks = document.querySelectorAll(`.${styles.userBlock}`);
 
         // Удаление класса choosed у всех элементов
@@ -48,31 +48,31 @@ const Users: React.FC = () => {
         
         const userBlock = event.currentTarget;
         console.log(userBlock);
-        const isChoosed = userBlock.classList.contains(styles.choosed);
-        if (!isChoosed) {
-            const firstChild = userBlock.querySelector(`#${userBlock.id}_click`);
+        // const isChoosed = userBlock.classList.contains(styles.choosed);
+        // if (!isChoosed) {
+        //     const firstChild = userBlock.querySelector(`#${userBlock.id}_click`);
         
-            const rect = userBlock.getBoundingClientRect();
-            const offsetX = event.clientX - rect.left - rect.width/2;
-            const offsetY = event.clientY - rect.top - rect.height/2;
-            console.log(offsetX, offsetY);
-            let percentX = offsetX * 100 / rect.width;
-            let percentY = offsetY * 100 / rect.height;
+        //     const rect = userBlock.getBoundingClientRect();
+        //     const offsetX = event.clientX - rect.left - rect.width/2;
+        //     const offsetY = event.clientY - rect.top - rect.height/2;
+        //     console.log(offsetX, offsetY);
+        //     let percentX = offsetX * 100 / rect.width;
+        //     let percentY = offsetY * 100 / rect.height;
 
-            firstChild.style.top = `${percentY+50}%`;
-            firstChild.style.left = `${percentX+50}%`;
-            firstChild.style.width = "250%";
-            firstChild.style.backgroundColor = "rgb(241, 238, 255)";
-            setTimeout(() => {
-                userBlock.classList.toggle(styles.choosed);
-                firstChild.style.width = "0%";
-                firstChild.style.display = 'none';
-                firstChild.style.backgroundColor = "rgb(195, 182, 255)";
-                setTimeout(() => {
-                    firstChild.style.display = 'block';
-                }, 500);
-            }, 600);
-        }
+        //     firstChild.style.top = `${percentY+50}%`;
+        //     firstChild.style.left = `${percentX+50}%`;
+        //     firstChild.style.width = "250%";
+        //     firstChild.style.backgroundColor = "rgb(241, 238, 255)";
+        //     setTimeout(() => {
+        //         userBlock.classList.toggle(styles.choosed);
+        //         firstChild.style.width = "0%";
+        //         firstChild.style.display = 'none';
+        //         firstChild.style.backgroundColor = "rgb(195, 182, 255)";
+        //         setTimeout(() => {
+        //             firstChild.style.display = 'block';
+        //         }, 500);
+        //     }, 600);
+        // }
         window.location.pathname = `/users/${id}`;
         // return <Navigate to={} />;
     };
@@ -80,26 +80,26 @@ const Users: React.FC = () => {
     return (
         <>
             <div className={styles.wall}>
-                {usersResp.users.map((user: UserObject, index: number) => (
+                {usersResp.chats.map((user: string, index: number) => (
                     <div 
-                        style={{zIndex: usersResp.total_users - index}}
-                        id={`user_${user.id}`}
-                        onClick={ (e) => handleChoose(e, user.id) }
+                        style={{zIndex: usersResp.chats.length - index}}
+                        id={`user_${user}`}
+                        onClick={ (e) => handleChoose(e, user) }
                         className={`${styles.userBlock}`}
                     >
                         <img src="" alt="" className={styles.userAvatar} />
                         <div className={styles.userTop}>
                             <div className={styles.userName}>
-                                {user.Фамилия} {user.Имя}
+                                {user}
                             </div>
-                            <div className={styles.userLastDate}>
+                            {/* <div className={styles.userLastDate}>
                                 {user.Почта}
-                            </div>
+                            </div> */}
                             {/* <div className={styles.userLastTheme}>
                                 {user.lastTheme}
                             </div> */}
                         </div>
-                        <div style={{zIndex: -100}} id={`user_${user.id}_click`} className={styles.click}></div>
+                        <div style={{zIndex: -100}} id={`user_${user}_click`} className={styles.click}></div>
                     </div>
                 ))}
                 <Spinner display={!getStatus} />

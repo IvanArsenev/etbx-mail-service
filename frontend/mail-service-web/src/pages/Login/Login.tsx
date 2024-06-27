@@ -14,7 +14,7 @@ const Login: React.FC = () => {
     useEffect(() => {
         const verifyAuth = async () => {
           const user = await checkAuth();
-          if (user?.message !== 'Войдите в систему!') {
+          if (user?.message !== 'Войдите в систему!' && user !== null) {
             navigate('/users');
           }
         };

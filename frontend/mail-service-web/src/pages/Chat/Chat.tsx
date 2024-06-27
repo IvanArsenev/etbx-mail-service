@@ -22,11 +22,12 @@ const Users: React.FC<IProps> = (items: IProps) => {
   const [user, setUser] = useState<UserObject | null>(null);
 
   const navigate = useNavigate();
-
   useEffect(() => {
+    
     setGetStatus(false);
     setChatResp({messages: []});
     const fetchUsers = async () => {
+        
         try {
           if (localStorage.getItem('mailChoosedTheme')) {
             const fetched = await GetMessages(items.userId ?? '', items.theme ?? '');
@@ -51,6 +52,11 @@ const Users: React.FC<IProps> = (items: IProps) => {
 
     verifyAuth();
   }, [navigate]);
+
+
+  const handleMessageSended = () => {
+    navigate(`/users/${items.userId}`);
+  }
   
   return (
     <div style={{display: 'flex', flexDirection: 'column', width: '100%'}}>
@@ -70,7 +76,7 @@ const Users: React.FC<IProps> = (items: IProps) => {
 
             const isFirst = message.sender !== prevUserId;
             const isLast = message.sender !== nextUserId;
-            
+            console.log(user?.Почта, message.sender)
             return (
               <div style={{display: message.subject === items.theme ? '' : 'none'}} className={`${styles.messageBlock} ${user?.Почта === message.sender ? styles.myMessageBlock : ''}`}>
                 <div className={styles.avatarBlock}>
@@ -90,7 +96,7 @@ const Users: React.FC<IProps> = (items: IProps) => {
           })
         }
       </div>
-      <CreateMessage />
+      <CreateMessage userId={items.userId} theme={items.theme} sendMsg={handleMessageSended}/>
     </div>
   );
 };

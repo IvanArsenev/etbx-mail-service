@@ -22,7 +22,7 @@ const Chats: React.FC = () => {
             try {
                 if (id) {
                     const fetched = await GetThemes(id ?? '');
-                    
+                    console.log(fetched)
                     setChatsResp(fetched?.themes ?? []);
                     setGetStatus(true);
 
@@ -40,55 +40,55 @@ const Chats: React.FC = () => {
         fetchUsers();
     }, [id]);
 
-    const handleChoose = (event): void => {
-        const themeBlocks = document.querySelectorAll(`.${styles.themeBlock}`);
+    const handleChoose = (event: string): void => {
+        // const themeBlocks = document.querySelectorAll(`.${styles.themeBlock}`);
 
-        // localStorage.setItem('mailChoosedTheme', event.currentTarget.id.split('_')[1]);
-        console.log(event.currentTarget.id.split('_')[1]);
-        setTheme(chatsResp[parseInt(event.currentTarget.id.split('_')[1])]);
+        localStorage.setItem('mailChoosedTheme', event);
+        // console.log(event.currentTarget.id.split('_')[1]);
+        setTheme(event);
 
         // Удаление класса choosed у всех элементов
-        themeBlocks.forEach((block) => {
-            block.classList.remove(styles.choosed);
-        });
+        // themeBlocks.forEach((block) => {
+        //     block.classList.remove(styles.choosed);
+        // });
         
-        const themeBlock = event.currentTarget;
-        const isChoosed = themeBlock.classList.contains(styles.choosed);
-        if (!isChoosed) {
-            const firstChild = themeBlock.querySelector(`#${themeBlock.id}_click`);
+        // const themeBlock = event.currentTarget;
+        // const isChoosed = themeBlock.classList.contains(styles.choosed);
+        // if (!isChoosed) {
+        //     const firstChild = themeBlock.querySelector(`#${themeBlock.id}_click`);
         
-            const rect = themeBlock.getBoundingClientRect();
-            const offsetX = event.clientX - rect.left - rect.width/2;
-            const offsetY = event.clientY - rect.top - rect.height/2;
+        //     const rect = themeBlock.getBoundingClientRect();
+        //     const offsetX = event.clientX - rect.left - rect.width/2;
+        //     const offsetY = event.clientY - rect.top - rect.height/2;
 
-            let percentX = offsetX * 100 / rect.width;
-            let percentY = offsetY * 100 / rect.height;
+        //     let percentX = offsetX * 100 / rect.width;
+        //     let percentY = offsetY * 100 / rect.height;
 
-            firstChild.style.top = `${percentY+50}%`;
-            firstChild.style.left = `${percentX+50}%`;
-            firstChild.style.width = "250%";
-            firstChild.style.backgroundColor = "rgb(241, 238, 255)";
-            setTimeout(() => {
-                themeBlock.classList.toggle(styles.choosed);
-                firstChild.style.width = "0%";
-                firstChild.style.display = 'none';
-                firstChild.style.backgroundColor = "rgb(195, 182, 255)";
-                setTimeout(() => {
-                    firstChild.style.display = 'block';
-                }, 500);
-            }, 600);
-        }
+        //     firstChild.style.top = `${percentY+50}%`;
+        //     firstChild.style.left = `${percentX+50}%`;
+        //     firstChild.style.width = "250%";
+        //     firstChild.style.backgroundColor = "rgb(241, 238, 255)";
+        //     setTimeout(() => {
+        //         themeBlock.classList.toggle(styles.choosed);
+        //         firstChild.style.width = "0%";
+        //         firstChild.style.display = 'none';
+        //         firstChild.style.backgroundColor = "rgb(195, 182, 255)";
+        //         setTimeout(() => {
+        //             firstChild.style.display = 'block';
+        //         }, 500);
+        //     }, 600);
+        // }
     };
 
     return (
         <>
         <div className={styles.wall}>
             {chatsResp.map((theme, index) => (
-                <div style={{zIndex: chatsResp.length - index}} id={`theme_${index}`} onClick={ (e) => handleChoose(e) } className={`${styles.themeBlock}`}>
-                    <div id={`theme_${index}_click`} className={styles.click}></div>
-                    <img src="" alt="" className={styles.themeAvatar} />
-                    <div className={styles.themeTop}>
-                        <div className={styles.themeName}>
+                <div style={{zIndex: chatsResp.length - index}} id={`${index}`} onClick={ (e) => handleChoose(theme) } className={`${styles.themeBlock}`}>
+                    <div id={`${index}`} className={styles.click} onClick={ (e) => handleChoose(theme) } ></div>
+                    <img src="" alt="" className={styles.themeAvatar} onClick={ (e) => handleChoose(theme) } />
+                    <div className={styles.themeTop} onClick={ (e) => handleChoose(theme) } >
+                        <div className={styles.themeName} onClick={ (e) => handleChoose(theme) } >
                             {theme}
                         </div>
                         {/* <div className={styles.themeLastDate}>

@@ -124,10 +124,13 @@
     padding: 6px;
     border-radius: 6px;
     text-align: center;
+    justify-content: center;
     font-size: 14pt;
-    display: inline-block;
+    display: flex;
+    flex-direction: row;
     margin-top: 4px;
     box-sizing: border-box;
+    margin: 4px;
 }
 
 .buttonInactive {
