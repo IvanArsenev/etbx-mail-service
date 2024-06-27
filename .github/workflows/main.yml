@@ -15,20 +15,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Set up Docker
-      run: |
-        mkdir -p $HOME/.semgrep
-        cp $GITHUB_WORKSPACE/.github/workflows/rules.yml $HOME/.semgrep/rules.yml
-
-    - name: Pull Semgrep Docker image
-      run: docker pull returntocorp/semgrep:0.69.0
-
     - name: Run Semgrep security scan
-      uses: addnab/docker-run-action@v3
+      run: docker run --rm -v $(pwd):/src returntocorp/semgrep semgrep --config /src/.github/workflows/rules.yaml -o /src/semgrep-report.html
+
+    - name: Upload Semgrep report
+      uses: actions/upload-artifact@v2
       with:
-        image: returntocorp/semgrep:0.69.0
-        options: --rm -v ${{ github.workspace }}:/src -v $HOME/.semgrep:/config
-        run: semgrep --config /config/rules.yml --config /src
+        name: semgrep-report
+        path: semgrep-report.html
 
   dependency-check:
     runs-on: ubuntu-latest
