@@ -10,7 +10,7 @@ export interface UserData {
 
 export async function registerUser(data: UserData): Promise<any> {
   const url = 'http://etbx.ru:7070/register';
-  console.log(data)
+  
   try {
     const response = await fetch(url, {
       method: 'POST',

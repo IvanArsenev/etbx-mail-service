@@ -76,14 +76,14 @@ const Users: React.FC<IProps> = (items: IProps) => {
 
             const isFirst = message.sender !== prevUserId;
             const isLast = message.sender !== nextUserId;
-            console.log(user?.Почта, message.sender)
+            console.log(user, user?.Логин === message.sender, 'sdfsdfsdfsd');
             return (
-              <div style={{display: message.subject === items.theme ? '' : 'none'}} className={`${styles.messageBlock} ${user?.Почта === message.sender ? styles.myMessageBlock : ''}`}>
+              <div style={{display: message.subject === items.theme ? '' : 'none'}} className={`${styles.messageBlock} ${user?.Логин === message.sender ? styles.myMessageBlock : ''}`}>
                 <div className={styles.avatarBlock}>
                   {isLast ? <img src="" alt="" className={styles.userAvatar} /> : <></>}
                 </div>
                 <div className={`${styles.message} ${isFirst ? styles.firstMessage : ''}
-                ${isLast ? styles.lastMessage : ''} ${user?.Почта === message.sender ? styles.myMessage : ''}`}>
+                ${isLast ? styles.lastMessage : ''} ${user?.Логин === message.sender ? styles.myMessage : ''}`}>
                   <div className={styles.content}>
                     {message.body}
                   </div>

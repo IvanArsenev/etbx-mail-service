@@ -1,6 +1,5 @@
 export async function GetMessages(userId:string, theme: string): Promise<any> {
   const url = `http://etbx.ru:7070/get_messages_by_theme/${userId}/${theme}`;
-  console.log(url);
   try {
     const token = localStorage.getItem('mailServiceToken');
     const response = await fetch(url, {
@@ -24,14 +23,11 @@ export async function GetMessages(userId:string, theme: string): Promise<any> {
 
 export async function SendMessage(receiver:string, theme: string, body: string): Promise<any> {
   const url = `http://etbx.ru:7070/send`;
-  console.log(url);
-  console.log(receiver)
   const data = {
     receiver: receiver,
     body: body,
     theme: theme
   }
-  console.log(data);
   try {
     const token = localStorage.getItem('mailServiceToken');
     

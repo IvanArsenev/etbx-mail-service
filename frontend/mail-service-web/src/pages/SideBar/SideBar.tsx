@@ -11,7 +11,6 @@ const SideBar: React.FC = () => {
     useEffect(() => {
         const verifyAuth = async () => {
           const user = await checkAuth();
-          console.log(user);
           if (user?.message === 'Войдите в систему!' || user === null) {
             navigate('/');
           }
@@ -22,7 +21,6 @@ const SideBar: React.FC = () => {
 
     const handleLogout = async () => {
         const res = await Logout();
-        console.log(res);
         navigate('/');
     }
 
