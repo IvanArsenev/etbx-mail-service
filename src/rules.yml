@@ -8,8 +8,6 @@ rules:
       Detected potential SQL injection. Use parameterized queries instead.
     languages: [python]
     severity: ERROR
-    metadata:
-      owasp: A1: Injection
 
   - id: fastapi-open-redirect
     patterns:
