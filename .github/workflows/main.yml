@@ -23,7 +23,7 @@ jobs:
     - name: Run Semgrep security scan
       uses: addnab/docker-run-action@v3
       with:
-        image: returntocorp/semgrep
+        image: returntocorp/semgrep:0.69.0
         options: --rm -v ${{ github.workspace }}:/src -v $HOME/.semgrep:/config
         run: semgrep --config /config/rules.yml --config /src
 
