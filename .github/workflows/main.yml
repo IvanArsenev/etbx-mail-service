@@ -1,4 +1,4 @@
-name: Dependency-Check
+name: Security Scan
 
 on:
   push:
@@ -9,6 +9,18 @@ on:
       - main
 
 jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: action/checkout@v2
+
+    - name: Run Semgrep security scan
+      uses: docker://returntocorp/semgrep
+      with:
+        args: semgrep --config rules.yaml
+
+        
   dependency-check:
     runs-on: ubuntu-latest
 
