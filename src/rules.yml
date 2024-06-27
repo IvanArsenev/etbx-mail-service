@@ -19,8 +19,6 @@ rules:
       Detected potential open redirect. Ensure the path is validated or sanitized.
     languages: [python]
     severity: WARNING
-    metadata:
-      owasp: A10: Open Redirects
 
   - id: hardcoded-secrets
     patterns:
@@ -33,8 +31,6 @@ rules:
       Hardcoded secret detected. Consider using environment variables or a secrets manager.
     languages: [python]
     severity: ERROR
-    metadata:
-      owasp: A2: Broken Authentication
 
   - id: fastapi-debug-true
     patterns:
@@ -45,8 +41,6 @@ rules:
       Debug mode is enabled. Disable it in production.
     languages: [python]
     severity: ERROR
-    metadata:
-      owasp: A6: Security Misconfiguration
 
   - id: fastapi-cors-any-origin
     patterns:
@@ -64,5 +58,3 @@ rules:
       CORS with allow_origins set to ["*"] detected. Restrict the origins to trusted domains.
     languages: [python]
     severity: WARNING
-    metadata:
-      owasp: A5: Security Misconfiguration
