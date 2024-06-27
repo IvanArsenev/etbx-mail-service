@@ -18,14 +18,14 @@ jobs:
     - name: Set up Docker
       run: |
         mkdir -p $HOME/.semgrep
-        cp $GITHUB_WORKSPACE/rules.yaml $HOME/.semgrep/rules.yaml
+        cp $GITHUB_WORKSPACE/.github/workflows/rules.yml $HOME/.semgrep/rules.yml
 
     - name: Run Semgrep security scan
       uses: addnab/docker-run-action@v3
       with:
         image: returntocorp/semgrep
         options: --rm -v ${{ github.workspace }}:/src -v $HOME/.semgrep:/config
-        run: semgrep --config /config/rules.yaml --config /src
+        run: semgrep --config /config/rules.yml --config /src
 
   dependency-check:
     runs-on: ubuntu-latest
