@@ -16,13 +16,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Run Semgrep security scan
-      run: docker run --rm -v $(pwd):/src returntocorp/semgrep semgrep --config /src/rules.yaml -o /srcsemgrep-report.html
-
-    - name: Upload Semgrep report
-      uses: actions/upload-artifact@v2
-      with:
-        name: semgrep-report
-        path: semgrep-report.html
+      run: docker run --rm -v ${{ github.workspace }}:/src returntocorp/semgrep semgrep --config /src/src/rules.yml
 
   dependency-check:
     runs-on: ubuntu-latest
