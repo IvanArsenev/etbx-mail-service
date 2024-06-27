@@ -15,10 +15,17 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
+    - name: Set up Docker
+      run: |
+        mkdir -p $HOME/.semgrep
+        cp rules.yaml $HOME/.semgrep/rules.yaml
+
     - name: Run Semgrep security scan
-      uses: docker://returntocorp/semgrep
+      uses: addnab/docker-run-action@v3
       with:
-        args: semgrep --config rules.yaml
+        image: returntocorp/semgrep
+        options: --rm -v ${{ github.workspace }}:/src -v $HOME/.semgrep:/config
+        run: semgrep --config /config/rules.yaml --config /src
 
   dependency-check:
     runs-on: ubuntu-latest
