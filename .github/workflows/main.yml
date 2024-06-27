@@ -41,7 +41,8 @@ jobs:
 
       - name: Run dependency-check
         run: |
-          java -jar ./dependency-check/bin/dependency-check.jar --scan .
+          java -jar ./dependency-check/dependency-check.jar --scan .
+
 
       - name: Upload report
         uses: actions/upload-artifact@v2
