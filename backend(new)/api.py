@@ -1,4 +1,4 @@
-import uvicorn, jwt, re, os, logging
+import uvicorn, jwt, re, os
 from fastapi import Depends, status, FastAPI, HTTPException, Query, File, UploadFile, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer
@@ -21,8 +21,6 @@ from email.header import decode_header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import smtplib
-
-logging.basicConfig(filename='app.log', level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
 app = FastAPI()
 
@@ -47,16 +45,12 @@ Base = sqlorm.declarative_base()
 def delete_file(file_path: str):
     if os.path.exists(file_path):
         os.remove(file_path)
-        logging.info(f"Deleted file: {file_path}")
-    else:
-        logging.warning(f"File not found during delete operation: {file_path}")
 
 def fetch_email_attachment(email_user, app_password, mail_id, filename, folder="All Mail", imap_server="mail.pmc-python.ru", save_path="files"):
     mail = imaplib.IMAP4_SSL(imap_server, 993)
     try:
         mail.login(email_user, app_password)
-    except Exception as e:
-        logging.error(f"IMAP login failed for {email_user}: {str(e)}")
+    except:
         return 'Error', ''
     mail.select(folder)
     status, messages = mail.search(None, 'ALL')
@@ -84,7 +78,6 @@ def fetch_email_attachment(email_user, app_password, mail_id, filename, folder="
                                 with open(file_path, "wb") as f:
                                     f.write(file_data)
                                 mail.logout()
-                                logging.info(f"Saved attachment: {file_path}")
                                 return file_path, part.get_content_type()
     mail.logout()
     raise HTTPException(status_code=404, detail="Вложение не найдено")
@@ -211,9 +204,8 @@ def login_and_fetch_emails(email_user, app_password, folder="All Mail", unseen='
                                 elif content_type == "text/html":
                                     soup = BeautifulSoup(part_body, "html.parser")
                                     body += soup.get_text()
-                            except Exception as e:
-                                print(f"Unexpected error: {e}")
-                                raise
+                            except:
+                                pass
                 else:
                     body = msg.get_payload(decode=True).decode()
                     if msg.get_content_type() == "text/html":
@@ -324,31 +316,20 @@ async def get_users(page: int = Query(1, ge=1), page_size: int = Query(10, ge=1)
 
 @app.post("/register", tags=["Auth"])
 async def register_user(registration_request: RegistrationRequest):
-    logging.info(f"Регистрация пользователя с почтой: {registration_request.mail}@pmc-python.ru")
-
     db = SessionLocal()
-    logging.debug("Создание подключения к базе данных")
-
     existing_user = db.query(User).filter(User.mail == f'{registration_request.mail}@pmc-python.ru').first()
     if existing_user:
-        logging.warning(f"Пользователь с почтой {registration_request.mail}@pmc-python.ru уже зарегистрирован")
         db.close()
         raise HTTPException(status_code=400, detail="Пользователь с таким логином уже зарегистрирован")
-
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
     }
-
     response = requests.get(f"https://pmc-python.ru/api/v1/user/{registration_request.mail}@pmc-python.ru", headers=headers)
     if response:
-        logging.warning(f"Запрос к внешнему API вернул успешный ответ. Пользователь уже существует.")
         db.close()
         raise HTTPException(status_code=400, detail="Пользователь с таким логином уже зарегистрирован")
-
     encrypted_password = encrypt_password(registration_request.password)
-    logging.debug("Шифрование пароля")
-
     new_user = User(
         name=registration_request.name,
         surname=registration_request.surname,
@@ -359,36 +340,27 @@ async def register_user(registration_request: RegistrationRequest):
         password=encrypted_password,
         token=create_access_token(data={"sub": f'{registration_request.mail}@pmc-python.ru'})
     )
-
     external_api_data = {
         "email": f'{registration_request.mail}@pmc-python.ru',
         "raw_password": registration_request.password,
         "displayed_name": f"{registration_request.name} {registration_request.surname}"
     }
-
     response = requests.post("https://pmc-python.ru/api/v1/user", json=external_api_data, headers=headers)
     if response.status_code != 201 and response.status_code != 200:
-        logging.error(f"Ошибка регистрации на внешнем сервере. Код ошибки: {response.status_code}. Текст ошибки: {response.text}")
         db.close()
         raise HTTPException(status_code=502, detail=f"Ошибка регистрации на внешнем сервере. Текст ошибки: {response.text}")
-
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     db.close()
-
-    logging.info(f"Пользователь успешно зарегистрирован. Почта: {new_user.mail}")
     return {"Token": new_user.token}
-
 
 @app.post("/login", tags=["Auth"])
 async def login_for_access_token(form_data: LoginRequest):
     mail_ru_domens = ['mail.ru', 'internet.ru', 'bk.ru', 'inbox.ru', 'list.ru']
-    logging.info(f"Попытка входа с email: {form_data.email}")
     if form_data.email.split('@')[1] == "pmc-python.ru":
         user = get_user_by_email(form_data.email)
         if not user:
-            logging.warning("Пользователь не найден")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Неправильный логин или пароль!",
@@ -396,7 +368,6 @@ async def login_for_access_token(form_data: LoginRequest):
             )
         decrypted_password = decrypt_password(user.password)
         if form_data.password != decrypted_password:
-            logging.warning("Неправильный пароль")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Неправильный логин или пароль",
@@ -416,7 +387,6 @@ async def login_for_access_token(form_data: LoginRequest):
         try:
             mail.login(f'{form_data.email}', f'{form_data.password}')
         except:
-            logging.error("Ошибка входа")
             return {"message": "Ошибка. Некорректные данные для входа!"}
         db = SessionLocal()
         encrypted_password = encrypt_password(form_data.password)
@@ -440,7 +410,6 @@ async def login_for_access_token(form_data: LoginRequest):
         db.close()
         return {"Token": new_user.token}
     else:
-        logging.error("Некорректные данные для входа")
         return {"message": "Ошибка. Некорректные данные для входа!"}
 
 @app.get("/avatars/{image_name}", tags=["Users"])
@@ -726,8 +695,5 @@ async def get_attachment(folder: str, mail_id: str, file_name: str, background_t
     background_tasks.add_task(delete_file, file_path)
     return FileResponse(file_path, media_type=content_type, filename=file_name)
 
-@app.get("/")
-async def test():
-    return {"message": "Ok!"}
 
 uvicorn.run(app, host=run_host, port=run_port)
