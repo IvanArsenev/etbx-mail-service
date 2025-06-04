@@ -1,1 +1,0 @@
-# etbx-mail-service
